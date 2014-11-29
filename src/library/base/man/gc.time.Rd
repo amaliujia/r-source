@@ -1,6 +1,6 @@
 % File src/library/base/man/gc.time.Rd
 % Part of the R package, http://www.R-project.org
-% Copyright 1995-2011 R Core Team
+% Copyright 1995-2013 R Core Team
 % Distributed under GPL 2 or later
 
 \name{gc.time}
@@ -26,10 +26,9 @@ gc.time(on = TRUE)
   be given as \code{NA}.
 }
 \details{
-  The timings are rounded up by the sampling interval for timing
-  processes, and so are likely to be over-estimates.
+  Due to timer resolution this may be under-estimate.
 
-  It is a \link{primitive}.
+  This is a \link{primitive}.
 }
 \seealso{\code{\link{gc}},
   \code{\link{proc.time}} for the timings for the session.}

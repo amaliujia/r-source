@@ -1,6 +1,6 @@
 /*
  *  R : A Computer Language for Statistical Data Analysis
- *  Copyright (C) 2000-11  R Core Team
+ *  Copyright (C) 2000-2013  R Core Team
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -76,8 +76,8 @@ void rcmdusage (char *RCMD)
 	    "  Rdiff    difference R output files\n",
 	    "  Rd2pdf   Convert Rd format to PDF\n",
 	    "  Rd2txt   Convert Rd format to pretty text\n",
-	    "  Stangle  Extract S/R code from Sweave documentation\n",
-	    "  Sweave   Process Sweave documentation\n",
+	    "  Stangle   Extract S/R code from vignette\n",
+	    "  Sweave    Process vignette documentation\n",
 	    "  config   Obtain configuration information about R\n"
 	    "  open     Open a file via Windows file associations\n"
 	    "  texify   Process a latex file\n"
@@ -167,7 +167,7 @@ int rcmdfn (int cmdarg, int argc, char **argv)
 		fprintf(stderr, "command line too long\n");
 		return(27);
 	    }
-	    if(strchr(argv[i], ' ')) {
+	    if(strchr(argv[i], ' ') || !strlen(argv[i])) {
 		strcat(cmd, "\"");
 		strcat(cmd, argv[i]);
 		strcat(cmd, "\"");

@@ -1,6 +1,6 @@
 
-R version 3.0.0 RC (2013-03-29 r62438) -- "Masked Marvel"
-Copyright (C) 2013 The R Foundation for Statistical Computing
+R version 3.1.2 RC (2014-10-29 r66897) -- "Pumpkin Helmet"
+Copyright (C) 2014 The R Foundation for Statistical Computing
 Platform: x86_64-unknown-linux-gnu (64-bit)
 
 R is free software and comes with ABSOLUTELY NO WARRANTY.
@@ -100,8 +100,7 @@ Type 'q()' to quit R.
 +         }
 +     }
 +     lab <- deparse(substitute(L))
-+     for (i in seq_along(L)) {
-+         case <- L[[i]]
++     for (case in L) {
 +         do_check(case, any)
 +         do_check(case, all)
 +     }

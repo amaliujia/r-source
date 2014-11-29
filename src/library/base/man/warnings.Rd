@@ -1,13 +1,16 @@
 % File src/library/base/man/warnings.Rd
 % Part of the R package, http://www.R-project.org
-% Copyright 1995-2007 R Core Team
+% Copyright 1995-2014 R Core Team
 % Distributed under GPL 2 or later
 
 \name{warnings}
+\title{Print Warning Messages}
 \alias{warnings}
 \alias{last.warning}
 \alias{print.warnings}
-\title{Print Warning Messages}
+\alias{[.warnings}
+\alias{c.warnings}
+\alias{unique.warnings}
 \description{
   \code{warnings} and its \code{print} method print the
   variable \code{last.warning} in a pleasing form.
@@ -35,11 +38,13 @@ warnings(\dots)
 }
 \section{Warning}{
   It is undocumented where \code{last.warning} is stored nor that it is
-  visible, and this is subject to change.  Prior to \R 2.4.0 it was
-  stored in the workspace, but no longer.
+  visible, and this is subject to change.
 }
 \seealso{
   \code{\link{warning}}.
+}
+\value{an object of S3 class \code{"warnings"}, basically a named
+  \code{\link{list}}.
 }
 \examples{
 ## NB this example is intended to be pasted in,
@@ -51,6 +56,13 @@ for(w in -1:1) {
 }
 warnings()
 options(ow) # reset
+tail(warnings(), 2) # see the last two warnings only (via '[' method)
+\dontshow{
+ww <- warnings()
+uw <- unique(ww)
+stopifnot(identical(c(ww[1], ww[3]), ww[c(1, 3)]),
+          length(uw) == 1, nchar(names(uw)) > 10)
+}
 }
 \keyword{programming}
 \keyword{error}

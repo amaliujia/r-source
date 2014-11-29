@@ -1,7 +1,7 @@
 #  File src/library/base/R/strwrap.R
 #  Part of the R package, http://www.R-project.org
 #
-#  Copyright (C) 1995-2012 The R Core Team
+#  Copyright (C) 1995-2013 The R Core Team
 #
 #  This program is free software; you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
@@ -52,7 +52,7 @@ function(x, width = 0.9 * getOption("width"), indent = 0, exdent = 0,
             ## Format paragraph j in x[i].
             words <- z[[i]][[j]]
             nc <- nchar(words, type="w")
-	    if(any(is.na(nc))) {
+	    if(anyNA(nc)) {
 		## use byte count as a reasonable substitute
 		nc0 <- nchar(words, type="b")
 		nc[is.na(nc)] <- nc0[is.na(nc)]

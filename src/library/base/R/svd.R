@@ -18,18 +18,20 @@
 
 svd <- function(x, nu = min(n,p), nv = min(n,p), LINPACK = FALSE)
 {
-    if(LINPACK)
-        warning("LINPACK = TRUE is defunct and will be ignored", domain = NA)
     x <- as.matrix(x)
     if (any(!is.finite(x))) stop("infinite or missing values in 'x'")
     dx <- dim(x)
     n <- dx[1L]
     p <- dx[2L]
     if(!n || !p) stop("a dimension is zero")
-    if (is.complex(x)) {
-        res <- La.svd(x, nu, nv)
-        return(list(d = res$d, u = if(nu) res$u, v = if(nv) Conj(t(res$vt))))
+    La.res <- La.svd(x, nu, nv)
+    res <- list(d = La.res$d)
+    if (nu) res$u <- La.res$u
+    if (nv) {
+	if (is.complex(x))
+	    res$v <- Conj(t(La.res$vt))
+	else
+	    res$v <- t(La.res$vt)
     }
-    res <- La.svd(x, nu, nv)
-    list(d = res$d, u = if(nu) res$u, v = if(nv) t(res$vt))
+    res
 }

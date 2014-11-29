@@ -2,7 +2,7 @@
 /*
  *  R : A Computer Langage for Statistical Data Analysis
  *  Copyright (C) 1995, 1996, 1997  Robert Gentleman and Ross Ihaka
- *  Copyright (C) 1997--2012  The R Core Team
+ *  Copyright (C) 1997--2014  The R Core Team
  *  Copyright (C) 2009--2011  Romain Francois
  *
  *  This program is free software; you can redistribute it and/or modify
@@ -30,7 +30,7 @@
 #include <R_ext/Print.h>
 
 #if !defined(__STDC_ISO_10646__) && (defined(__APPLE__) || defined(__FreeBSD__))
-/* This may not be 100% true (see the comment in rlocales.h),
+/* This may not be 100% true (see the comment in rlocale.h),
    but it seems true in normal locales */
 # define __STDC_ISO_10646__
 #endif
@@ -48,7 +48,7 @@ static void initData(void);
 static void initId(void);
 static void record_( int, int, int, int, int, int, char* ) ;
 
-static void yyerror(char *);
+static void yyerror(const char *);
 static int yylex();
 int yyparse(void);
 
@@ -77,9 +77,11 @@ typedef struct yyltype
 } yyltype;
 
 
-#define NLINES 1000       /* originally, number of lines in the file */
-#define DATA_SIZE  (length( ParseState.data ) / DATA_ROWS)
-#define ID_SIZE    (length( ParseState.ids ) / 2 - 1)
+#define INIT_DATA_COUNT 16384    	/* init parser data to this size */
+#define MAX_DATA_COUNT   65536		/* release it at the end if it is this size or larger*/
+
+#define DATA_COUNT  (ParseState.data ? length( ParseState.data ) / DATA_ROWS : 0)
+#define ID_COUNT    ((ParseState.ids ? length( ParseState.ids ) / 2 : 0) - 1)
 
 static void finalizeData( ) ;
 static void growData( ) ;
@@ -165,7 +167,6 @@ static void setId( SEXP expr, yyltype loc){
 static void	CheckFormalArgs(SEXP, SEXP, YYLTYPE *);
 static SEXP	FirstArg(SEXP, SEXP);
 static SEXP	GrowList(SEXP, SEXP);
-static SEXP	Insert(SEXP, SEXP);
 static void	IfPush(void);
 static int	KeywordLookup(const char *);
 static SEXP	NewList(void);
@@ -574,14 +575,10 @@ static SEXP makeSrcref(YYLTYPE *lloc, SEXP srcfile)
 
 static SEXP attachSrcrefs(SEXP val)
 {
-    SEXP t, srval;
-    int n;
+    SEXP srval;
 
     PROTECT(val);
-    t = CDR(SrcRefs);
-    PROTECT(srval = allocVector(VECSXP, length(t)));
-    for (n = 0 ; n < LENGTH(srval) ; n++, t = CDR(t))
-	SET_VECTOR_ELT(srval, n, CAR(t));
+    PROTECT(srval = PairToVectorList(SrcRefs));
     
     setAttrib(val, R_SrcrefSymbol, srval);
     setAttrib(val, R_SrcfileSymbol, ParseState.SrcFile);
@@ -597,7 +594,7 @@ static SEXP attachSrcrefs(SEXP val)
 	wholeFile.last_parsed = ParseState.xxparseno;
 	setAttrib(val, R_WholeSrcrefSymbol, makeSrcref(&wholeFile, ParseState.SrcFile));
     }
-    REPROTECT(SrcRefs = NewList(), srindex);
+    REPROTECT(SrcRefs = R_NilValue, srindex);
     ParseState.didAttach = TRUE;
     UNPROTECT(2);
     return val;
@@ -607,7 +604,7 @@ static int xxvalue(SEXP v, int k, YYLTYPE *lloc)
 {
     if (k > 2) {
 	if (ParseState.keepSrcRefs)
-	    REPROTECT(SrcRefs = GrowList(SrcRefs, makeSrcref(lloc, ParseState.SrcFile)), srindex);
+	    REPROTECT(SrcRefs = listAppend(SrcRefs, list1(makeSrcref(lloc, ParseState.SrcFile))), srindex);
 	UNPROTECT_PTR(v);
     }
     R_CurrentExpr = v;
@@ -680,7 +677,7 @@ static SEXP xxexprlist0(void)
 	PROTECT(ans = NewList());
 	if (ParseState.keepSrcRefs) {
 	    setAttrib(ans, R_SrcrefSymbol, SrcRefs);
-	    REPROTECT(SrcRefs = NewList(), srindex);
+	    REPROTECT(SrcRefs = R_NilValue, srindex);
 	}
     }
     else
@@ -695,8 +692,7 @@ static SEXP xxexprlist1(SEXP expr, YYLTYPE *lloc)
 	PROTECT(tmp = NewList());
 	if (ParseState.keepSrcRefs) {
 	    setAttrib(tmp, R_SrcrefSymbol, SrcRefs);
-	    REPROTECT(SrcRefs = NewList(), srindex);
-	    REPROTECT(SrcRefs = GrowList(SrcRefs, makeSrcref(lloc, ParseState.SrcFile)), srindex);
+	    REPROTECT(SrcRefs = list1(makeSrcref(lloc, ParseState.SrcFile)), srindex);
 	}
 	PROTECT(ans = GrowList(tmp, expr));
 	UNPROTECT_PTR(tmp);
@@ -712,7 +708,7 @@ static SEXP xxexprlist2(SEXP exprlist, SEXP expr, YYLTYPE *lloc)
     SEXP ans;
     if (GenerateCode) {
 	if (ParseState.keepSrcRefs)
-	    REPROTECT(SrcRefs = GrowList(SrcRefs, makeSrcref(lloc, ParseState.SrcFile)), srindex);
+	    REPROTECT(SrcRefs = listAppend(SrcRefs, list1(makeSrcref(lloc, ParseState.SrcFile))), srindex);
 	PROTECT(ans = GrowList(exprlist, expr));
     }
     else
@@ -1024,7 +1020,7 @@ static SEXP xxexprlist(SEXP a1, YYLTYPE *lloc, SEXP a2)
 	SETCAR(a2, a1);
 	if (ParseState.keepSrcRefs) {
 	    PROTECT(prevSrcrefs = getAttrib(a2, R_SrcrefSymbol));
-	    REPROTECT(SrcRefs = Insert(SrcRefs, makeSrcref(lloc, ParseState.SrcFile)), srindex);
+	    REPROTECT(SrcRefs = CONS(makeSrcref(lloc, ParseState.SrcFile), SrcRefs), srindex);
 	    PROTECT(ans = attachSrcrefs(a2));
 	    REPROTECT(SrcRefs = prevSrcrefs, srindex);
 	    /* SrcRefs got NAMED by being an attribute... */
@@ -1046,7 +1042,7 @@ static SEXP TagArg(SEXP arg, SEXP tag, YYLTYPE *lloc)
 {
     switch (TYPEOF(tag)) {
     case STRSXP:
-	tag = install(translateChar(STRING_ELT(tag, 0)));
+	tag = installTrChar(STRING_ELT(tag, 0));
     case NILSXP:
     case SYMSXP:
 	return lang2(arg, tag);
@@ -1082,18 +1078,6 @@ static SEXP GrowList(SEXP l, SEXP s)
     UNPROTECT(1);
     SETCDR(CAR(l), tmp);
     SETCAR(l, tmp);
-    return l;
-}
-
-/* Insert a new element at the head of a stretchy list */
-
-static SEXP Insert(SEXP l, SEXP s)
-{
-    SEXP tmp;
-    PROTECT(s);
-    tmp = CONS(s, CDR(l));
-    UNPROTECT(1);
-    SETCDR(l, tmp);
     return l;
 }
 
@@ -1179,26 +1163,35 @@ static char	contextstack[CONTEXTSTACK_SIZE], *contextp;
 static void PutSrcRefState(SrcRefState *state);
 static void UseSrcRefState(SrcRefState *state);
 
+/* This is called once when R starts up. */
 attribute_hidden
-void R_InitSrcRefState(SrcRefState *state)
+void InitParser(void)
+{
+    ParseState.data = NULL;
+    ParseState.ids = NULL;
+}
+
+/* This is called each time a new parse sequence begins */
+attribute_hidden
+void R_InitSrcRefState(void)
 {
     if (busy) {
-    	state->prevState = malloc(sizeof(SrcRefState));
-    	PutSrcRefState(state->prevState);
+    	SrcRefState *prev = malloc(sizeof(SrcRefState));
+    	PutSrcRefState(prev);
+	ParseState.prevState = prev;
+	ParseState.data = NULL;
+	ParseState.ids = NULL;
     } else
-        state->prevState = NULL;
-    state->keepSrcRefs = FALSE;
-    state->didAttach = FALSE;
-    PROTECT_WITH_INDEX(state->SrcFile = R_NilValue, &(state->SrcFileProt));
-    PROTECT_WITH_INDEX(state->Original = R_NilValue, &(state->OriginalProt));
-    PROTECT_WITH_INDEX(state->data = R_NilValue, &(state->DATA_INDEX)) ;
-    PROTECT_WITH_INDEX(state->text = R_NilValue, &(state->TEXT_INDEX)) ;
-    PROTECT_WITH_INDEX(state->ids = R_NilValue, &(state->ID_INDEX)) ;
-    state->data_count = 0;
-    state->xxlineno = 1;
-    state->xxcolno = 0;
-    state->xxbyteno = 0;
-    state->xxparseno = 1;
+        ParseState.prevState = NULL;
+    ParseState.keepSrcRefs = FALSE;
+    ParseState.didAttach = FALSE;
+    PROTECT_WITH_INDEX(ParseState.SrcFile = R_NilValue, &(ParseState.SrcFileProt));
+    PROTECT_WITH_INDEX(ParseState.Original = R_NilValue, &(ParseState.OriginalProt));
+    ParseState.data_count = 0;
+    ParseState.xxlineno = 1;
+    ParseState.xxcolno = 0;
+    ParseState.xxbyteno = 0;
+    ParseState.xxparseno = 1;
     busy = TRUE;
 }
 
@@ -1207,19 +1200,36 @@ void R_FinalizeSrcRefState(void)
 {
     UNPROTECT_PTR(ParseState.SrcFile);
     UNPROTECT_PTR(ParseState.Original);
-    UNPROTECT_PTR(ParseState.data);
-    UNPROTECT_PTR(ParseState.text);
-    UNPROTECT_PTR(ParseState.ids);
+    /* Free the data, text and ids if we are restoring a previous state,
+       or if they have grown too large */
+    if (ParseState.data) {
+    	if (ParseState.prevState || DATA_COUNT > MAX_DATA_COUNT) {
+	    R_ReleaseObject(ParseState.data);
+	    R_ReleaseObject(ParseState.text);
+	    ParseState.data = NULL;
+	} else /* Remove all the strings from the text vector so they don't take up memory, and clean up data */
+	    for (int i=0; i < ParseState.data_count; i++) {
+	    	SET_STRING_ELT(ParseState.text, i, R_BlankString);
+		_PARENT(i) = 0;
+	    }
+    } 
+    if (ParseState.ids) {
+	if (ParseState.prevState || ID_COUNT > MAX_DATA_COUNT) {
+	    R_ReleaseObject(ParseState.ids);
+	    ParseState.ids = NULL;
+        } else {/* Remove the parent records */
+            if (identifier > ID_COUNT) identifier = ID_COUNT;
+            for (int i=0; i < identifier; i++)
+	        ID_PARENT(i) = 0;
+	}
+    }
     ParseState.SrcFileProt = NA_INTEGER;
     ParseState.OriginalProt = NA_INTEGER;
-    ParseState.DATA_INDEX = NA_INTEGER;
-    ParseState.TEXT_INDEX = NA_INTEGER;
-    ParseState.ID_INDEX = NA_INTEGER;
     ParseState.data_count = NA_INTEGER;
     if (ParseState.prevState) {
-    	UseSrcRefState(ParseState.prevState);
-    	free(ParseState.prevState);
-    	ParseState.prevState = NULL;
+        SrcRefState *prev = ParseState.prevState;
+    	UseSrcRefState(prev);
+    	free(prev);
     } else
         busy = FALSE;
 }
@@ -1234,9 +1244,6 @@ static void UseSrcRefState(SrcRefState *state)
     ParseState.data = state->data;
     ParseState.text = state->text;
     ParseState.ids = state->ids;
-    ParseState.DATA_INDEX = state->DATA_INDEX;
-    ParseState.TEXT_INDEX = state->TEXT_INDEX;
-    ParseState.ID_INDEX = state->ID_INDEX;
     ParseState.data_count = state->data_count;
     ParseState.xxlineno = state->xxlineno;
     ParseState.xxcolno = state->xxcolno;
@@ -1257,9 +1264,6 @@ static void PutSrcRefState(SrcRefState *state)
 	state->data = ParseState.data;
 	state->text = ParseState.text;
 	state->ids = ParseState.ids;
-	state->DATA_INDEX = ParseState.DATA_INDEX;
-	state->TEXT_INDEX = ParseState.TEXT_INDEX;
-	state->ID_INDEX = ParseState.ID_INDEX;
 	state->data_count = ParseState.data_count;
 	state->xxlineno = ParseState.xxlineno;
 	state->xxcolno = ParseState.xxcolno;
@@ -1285,22 +1289,10 @@ static void ParseInit(void)
 static void initData(void)
 {
     ParseState.data_count = 0 ;
-
-    growData( ) ;
+    for (int i = 1; i <= ID_COUNT; i++)
+	ID_ID( i ) = 0;
 }
 
-/* We need to be careful with our protections.  Objects protected with an
-   index have to go on the stack before anything that is unprotected
-   with UNPROTECT_PTR, because that shifts the locations of later items. 
-   But they also can't go into loops, because that could blow up the
-   protection stack.  So we separate the allocation and initialization. */
-
-static void ParseContextClear(void)
-{
-    REPROTECT( ParseState.data = R_NilValue, ParseState.DATA_INDEX ) ;
-    REPROTECT( ParseState.text = R_NilValue, ParseState.TEXT_INDEX ) ;
-    REPROTECT( ParseState.ids = R_NilValue, ParseState.ID_INDEX ) ;
-}
 
 static void ParseContextInit(void)
 {
@@ -1309,14 +1301,10 @@ static void ParseContextInit(void)
     
     colon = 0 ;
 
-    /* Clear the data, text and ids to NULL */
-    ParseContextClear();
-
     /* starts the identifier counter*/
     initId();
 
     initData();
-    growID(15*NLINES);
 }
 
 static SEXP R_Parse1(ParseStatus *status)
@@ -1350,10 +1338,9 @@ static int file_getc(void)
 
 /* used in main.c */
 attribute_hidden
-SEXP R_Parse1File(FILE *fp, int gencode, ParseStatus *status, SrcRefState *state)
+SEXP R_Parse1File(FILE *fp, int gencode, ParseStatus *status)
 {
     int savestack;
-    UseSrcRefState(state);
     savestack = R_PPStackTop;    
     ParseInit();
     ParseContextInit();
@@ -1362,7 +1349,6 @@ SEXP R_Parse1File(FILE *fp, int gencode, ParseStatus *status, SrcRefState *state
     ptr_getc = file_getc;
     R_Parse1(status);
     R_PPStackTop = savestack;
-    PutSrcRefState(state);
     return R_CurrentExpr;
 }
 
@@ -1380,7 +1366,7 @@ SEXP R_Parse1Buffer(IoBuffer *buffer, int gencode, ParseStatus *status)
     Rboolean keepSource = FALSE; 
     int savestack;    
 
-    R_InitSrcRefState(&ParseState);
+    R_InitSrcRefState();
     savestack = R_PPStackTop;       
     if (gencode) {
     	keepSource = asLogical(GetOption1(install("keep.source")));
@@ -1388,7 +1374,7 @@ SEXP R_Parse1Buffer(IoBuffer *buffer, int gencode, ParseStatus *status)
     	    ParseState.keepSrcRefs = TRUE;
     	    REPROTECT(ParseState.SrcFile = NewEnvironment(R_NilValue, R_NilValue, R_EmptyEnv), ParseState.SrcFileProt);
 	    REPROTECT(ParseState.Original = ParseState.SrcFile, ParseState.OriginalProt);
-	    PROTECT_WITH_INDEX(SrcRefs = NewList(), &srindex);
+	    PROTECT_WITH_INDEX(SrcRefs = R_NilValue, &srindex);
 	}
     }
     ParseInit();
@@ -1434,7 +1420,7 @@ static SEXP R_Parse(int n, ParseStatus *status, SEXP srcfile)
     int i;
     SEXP t, rval;
 
-    R_InitSrcRefState(&ParseState);
+    R_InitSrcRefState();
     savestack = R_PPStackTop;
     
     ParseContextInit();
@@ -1445,7 +1431,7 @@ static SEXP R_Parse(int n, ParseStatus *status, SEXP srcfile)
     
     if (isEnvironment(ParseState.SrcFile)) {
     	ParseState.keepSrcRefs = TRUE;
-	PROTECT_WITH_INDEX(SrcRefs = NewList(), &srindex);
+	PROTECT_WITH_INDEX(SrcRefs = R_NilValue, &srindex);
     }
     
     for(i = 0; ; ) {
@@ -1461,6 +1447,8 @@ static SEXP R_Parse(int n, ParseStatus *status, SEXP srcfile)
 	    break;
 	case PARSE_INCOMPLETE:
 	case PARSE_ERROR:
+	    if (ParseState.keepSrcRefs) 
+	        finalizeData();
 	    R_PPStackTop = savestack;
 	    R_FinalizeSrcRefState();	    
 	    return R_NilValue;
@@ -1562,7 +1550,7 @@ SEXP R_ParseBuffer(IoBuffer *buffer, int n, ParseStatus *status, SEXP prompt,
     R_IoBufferWriteReset(buffer);
     buf[0] = '\0';
     bufp = buf;
-    R_InitSrcRefState(&ParseState);    
+    R_InitSrcRefState();    
     savestack = R_PPStackTop;
     PROTECT(t = NewList());
     
@@ -1575,7 +1563,7 @@ SEXP R_ParseBuffer(IoBuffer *buffer, int n, ParseStatus *status, SEXP prompt,
     
     if (isEnvironment(ParseState.SrcFile)) {
     	ParseState.keepSrcRefs = TRUE;
-	PROTECT_WITH_INDEX(SrcRefs = NewList(), &srindex);
+	PROTECT_WITH_INDEX(SrcRefs = R_NilValue, &srindex);
     }
     
     for(i = 0; ; ) {
@@ -1597,7 +1585,6 @@ SEXP R_ParseBuffer(IoBuffer *buffer, int n, ParseStatus *status, SEXP prompt,
 	ParseContextInit();
 	R_Parse1(status);
 	rval = R_CurrentExpr;
-	ParseContextClear();
 
 	switch(*status) {
 	case PARSE_NULL:
@@ -1851,7 +1838,7 @@ SEXP mkFalse(void)
     return s;
 }
 
-static void yyerror(char *s)
+static void yyerror(const char *s)
 {
     static const char *const yytname_translations[] =
     {
@@ -1925,12 +1912,15 @@ static void yyerror(char *s)
 		sprintf(R_ParseErrorMsg, _("unexpected %s"),
 		    i/2 < YYENGLISH ? _(yytname_translations[i+1])
 				    : yytname_translations[i+1]);
+                
 		return;
 	    }
 	}
-	sprintf(R_ParseErrorMsg, _("unexpected %s"), s + sizeof yyunexpected - 1);
+	snprintf(R_ParseErrorMsg, PARSE_ERROR_SIZE - 1, _("unexpected %s"),
+                 s + sizeof yyunexpected - 1);
     } else {
 	strncpy(R_ParseErrorMsg, s, PARSE_ERROR_SIZE - 1);
+        R_ParseErrorMsg[PARSE_ERROR_SIZE - 1] = '\0';
     }
 }
 
@@ -1938,7 +1928,7 @@ static void CheckFormalArgs(SEXP formlist, SEXP _new, YYLTYPE *lloc)
 {
     while (formlist != R_NilValue) {
 	if (TAG(formlist) == _new) {
-	    error(_("repeated formal argument '%s' on line %d"), CHAR(PRINTNAME(_new)),
+	    error(_("repeated formal argument '%s' on line %d"), EncodeChar(PRINTNAME(_new)),
 								 lloc->first_line);
 	}
 	formlist = CDR(formlist);
@@ -2086,11 +2076,16 @@ static int NumericValue(int c)
 	    YYTEXT_PUSH(c, yyp);
 	    while(isdigit(c = xxgetc()) || ('a' <= c && c <= 'f') ||
 		  ('A' <= c && c <= 'F') || c == '.') {
+		if (c == '.') {
+		    if (seendot) return ERROR;
+		    seendot = 1;
+		}
 		YYTEXT_PUSH(c, yyp);
 		nd++;
 	    }
 	    if (nd == 0) return ERROR;
 	    if (c == 'p' || c == 'P') {
+	        seenexp = 1;
 		YYTEXT_PUSH(c, yyp);
 		c = xxgetc();
 		if (!isdigit(c) && c != '+' && c != '-') return ERROR;
@@ -2102,6 +2097,7 @@ static int NumericValue(int c)
 		    YYTEXT_PUSH(c, yyp);
 		if (nd == 0) return ERROR;
 	    }
+            if (seendot && !seenexp) return ERROR;
 	    break;
 	}
 	if (c == 'E' || c == 'e') {
@@ -2126,7 +2122,11 @@ static int NumericValue(int c)
 	YYTEXT_PUSH(c, yyp);
 	last = c;
     }
-    YYTEXT_PUSH('\0', yyp);
+    
+    if(c == 'i')
+	YYTEXT_PUSH(c, yyp); /* for getParseData */
+	
+    YYTEXT_PUSH('\0', yyp);    
     /* Make certain that things are okay. */
     if(c == 'L') {
 	double a = R_atof(yytext);
@@ -2141,9 +2141,7 @@ static int NumericValue(int c)
 		    warning(_("integer literal %s contains decimal; using numeric value"), yytext);
 		else {
 		    /* hide the L for the warning message */
-		    *(yyp-2) = '\0';
 		    warning(_("non-integer value %s qualified with L; using numeric value"), yytext);
-		    *(yyp-2) = (char)c;
 		}
 	    }
 	    asNumeric = 1;
@@ -2198,6 +2196,9 @@ static int NumericValue(int c)
 /* The idea here is that if a string contains \u escapes that are not
    valid in the current locale, we should switch to UTF-8 for that
    string.  Needs Unicode wide-char support.
+
+   Defining __STDC_ISO_10646__ is done by the OS (nor to) in wchar.t.
+   Some (e.g. Solaris, FreeBSD) have Unicode wchar_t but do not define it.
 */
 
 #if defined(Win32) || defined(__STDC_ISO_10646__)
@@ -2261,10 +2262,7 @@ static SEXP mkStringUTF8(const ucs_t *wcs, int cnt)
     char s[nb];
     memset(s, 0, nb); /* safety */
 #ifdef WC_NOT_UNICODE
-    {
-	char *ss;
-	for(ss = s; *wcs; wcs++) ss += ucstoutf8(ss, *wcs);
-    }
+    for(char *ss = s; *wcs; wcs++) ss += ucstoutf8(ss, *wcs);
 #else
     wcstoutf8(s, wcs, nb);
 #endif
@@ -2447,6 +2445,7 @@ static int StringValue(int c, Rboolean forSymbol)
 		    break;
 		case '"':
 		case '\'':
+		case '`':
 		case ' ':
 		case '\n':
 		    break;
@@ -2671,6 +2670,14 @@ static SEXP install_and_save(char * text)
     return install(text);
 }
 
+/* Get an R symbol, and set different yytext.  Used for translation of -> to <-. ->> to <<- */
+static SEXP install_and_save2(char * text, char * savetext)
+{
+    strcpy(yytext, savetext);
+    return install(text);
+}
+
+
 /* Split the input stream into tokens. */
 /* This is the lowest of the parsing levels. */
 
@@ -2762,11 +2769,11 @@ static int token(void)
     case '-':
 	if (nextchar('>')) {
 	    if (nextchar('>')) {
-		yylval = install_and_save("<<-");
+		yylval = install_and_save2("<<-", "->>");
 		return RIGHT_ASSIGN;
 	    }
 	    else {
-		yylval = install_and_save("<-");
+		yylval = install_and_save2("<-", "->");
 		return RIGHT_ASSIGN;
 	    }
 	}
@@ -2856,9 +2863,8 @@ static int token(void)
 	   help for 'Deprecated'.  S-PLUS 6.2 still allowed this, so
 	   presumably it was for compatibility with S. */
 	if (nextchar('*')) {
-	    strcpy(yytext, "**");
-	    yylval = install("^");
-	    c = '^';
+	    yylval = install_and_save2("^", "**");
+	    return '^';
 	} else
 	    yylval = install_and_save("*");
 	return c;
@@ -3173,6 +3179,9 @@ static void record_( int first_parsed, int first_column, int last_parsed, int la
 	// don't care about zero sized things
 	if( !yytext[0] ) return ;
 	
+	if (ParseState.data_count == DATA_COUNT)
+	    growData();
+	
 	_FIRST_COLUMN( ParseState.data_count ) = first_column; 
 	_FIRST_PARSED( ParseState.data_count ) = first_parsed;
 	_LAST_COLUMN( ParseState.data_count )  = last_column;  
@@ -3185,16 +3194,12 @@ static void record_( int first_parsed, int first_column, int last_parsed, int la
 	else
 	    SET_STRING_ELT(ParseState.text, ParseState.data_count, mkChar(""));
 	
-	if( id > ID_SIZE ){
+	if( id > ID_COUNT ){
 		growID(id) ;
 	}
 	ID_ID( id ) = ParseState.data_count ; 
 	
 	ParseState.data_count++ ;
-	if( ParseState.data_count == DATA_SIZE ){
-		growData( ) ;
-	}
-	
 }
 
 /**
@@ -3208,7 +3213,7 @@ static void record_( int first_parsed, int first_column, int last_parsed, int la
  */
 static void recordParents( int parent, yyltype * childs, int nchilds){
 	
-	if( parent > ID_SIZE ){
+	if( parent > ID_COUNT ){
 		growID(parent) ;
 	}
 	
@@ -3239,7 +3244,7 @@ static void modif_token( yyltype* loc, int tok ){
 	
 	int id = loc->id ;
 	
-	if (!ParseState.keepSrcRefs || id < 0 || id > ID_SIZE) 
+	if (!ParseState.keepSrcRefs || id < 0 || id > ID_COUNT) 
 	    return;
 	    
 	if( tok == SYMBOL_FUNCTION_CALL ){
@@ -3247,7 +3252,7 @@ static void modif_token( yyltype* loc, int tok ){
 		int j = ID_ID( id ) ;
 		int parent = id ;
 		
-		if (j < 0 || j > ID_SIZE)
+		if (j < 0 || j > ID_COUNT)
 	            return;
 	            
 		while( ID_PARENT( _ID(j) ) != parent ){
@@ -3266,12 +3271,33 @@ static void modif_token( yyltype* loc, int tok ){
 	
 }
 
+/* this local version of lengthgets() always copies and doesn't fill with NA */
+static SEXP lengthgets2(SEXP x, int len) {
+    SEXP result;
+    PROTECT(result = allocVector( TYPEOF(x), len ));
+    
+    len = (len < length(x)) ? len : length(x);
+    switch(TYPEOF(x)) {
+    	case INTSXP: 
+    	    for (int i = 0; i < len; i++)
+    	    	INTEGER(result)[i] = INTEGER(x)[i];
+	    for (int i = len; i < length(result); i++)
+		INTEGER(result)[i] = 0;
+    	    break;
+    	case STRSXP:
+    	    for (int i = 0; i < len; i++)
+    	    	SET_STRING_ELT(result, i, STRING_ELT(x, i));
+    	    break;
+    	default:
+	    UNIMPLEMENTED_TYPE("lengthgets2", x);
+    }
+    UNPROTECT(1);
+    return result;
+}
+
 static void finalizeData( ){
 	
     int nloc = ParseState.data_count ;
-
-    SETLENGTH( ParseState.data, ParseState.data_count * DATA_ROWS ) ;
-    SETLENGTH( ParseState.text, ParseState.data_count );
 
     // int maxId = _ID(nloc-1) ;
     int i, j, id ;
@@ -3348,13 +3374,6 @@ static void finalizeData( ){
 	}
     }
 
-    SEXP dims ;
-    PROTECT( dims = allocVector( INTSXP, 2 ) ) ;
-    INTEGER(dims)[0] = DATA_ROWS ;
-    INTEGER(dims)[1] = ParseState.data_count ;
-    setAttrib( ParseState.data, install( "dim" ), dims ) ;
-    UNPROTECT(1) ; // dims
-
     /* attach the token names as an attribute so we don't need to switch to a dataframe, and decide on terminals */
     SEXP tokens;
     PROTECT(tokens = allocVector( STRSXP, nloc ) );
@@ -3363,19 +3382,37 @@ static void finalizeData( ){
         int xlat = yytranslate[token];
         if (xlat == 2) /* "unknown" */
             xlat = token;
-    	SET_STRING_ELT(tokens, i, mkChar(yytname[xlat]));
+        if (xlat < YYNTOKENS + YYNNTS)
+    	    SET_STRING_ELT(tokens, i, mkChar(yytname[xlat]));
+    	else { /* we have a token which doesn't have a name, e.g. an illegal character as in PR#15518 */
+    	    char name[2];
+    	    name[0] = (char) xlat;
+    	    name[1] = 0;
+    	    SET_STRING_ELT(tokens, i, mkChar(name));
+    	}
     	_TERMINAL(i) = xlat < YYNTOKENS;
     }
-    setAttrib( ParseState.data, install("tokens"), tokens );
-    setAttrib( ParseState.data, install("text"), ParseState.text );
-    UNPROTECT(1);
+    SEXP dims, newdata, newtext;
+    if (nloc) {
+	PROTECT( newdata = lengthgets2(ParseState.data, nloc * DATA_ROWS));
+	PROTECT( newtext = lengthgets2(ParseState.text, nloc));
+    } else {
+	PROTECT( newdata = allocVector( INTSXP, 0));
+	PROTECT( newtext = allocVector( STRSXP, 0));
+    }
+    PROTECT( dims = allocVector( INTSXP, 2 ) ) ;
+    INTEGER(dims)[0] = DATA_ROWS ;
+    INTEGER(dims)[1] = nloc ;
+    setAttrib( newdata, install( "dim" ), dims ) ;
+    setAttrib( newdata, install("tokens"), tokens );
+    setAttrib( newdata, install("text"), newtext );
     
-    setAttrib( ParseState.data, R_ClassSymbol, mkString("parseData"));
+    setAttrib(newdata, R_ClassSymbol, mkString("parseData"));
     
     /* Put it into the srcfile environment */
     if (isEnvironment(ParseState.SrcFile)) 
-    	defineVar(install("parseData"), ParseState.data, ParseState.SrcFile);
-
+    	defineVar(install("parseData"), newdata, ParseState.SrcFile);
+    UNPROTECT(4);
 }
 
 /**
@@ -3383,27 +3420,21 @@ static void finalizeData( ){
  */
 static void growData(){
 	
-	SEXP bigger, biggertext ; 
-	int current_data_size = DATA_SIZE;
-	int data_size = current_data_size;
-	data_size += NLINES * 10 ;
+    SEXP bigger, biggertext ; 
+    int new_data_count;	
+    if (!ParseState.data) {
+        new_data_count = INIT_DATA_COUNT;
+    	R_PreserveObject(ParseState.data = allocVector(INTSXP, 0));
+    	R_PreserveObject(ParseState.text = allocVector(STRSXP, 0));
+    } else
+        new_data_count = 2*DATA_COUNT;
 	
-	PROTECT( bigger = allocVector( INTSXP, data_size * DATA_ROWS ) ) ; 
-	PROTECT( biggertext = allocVector( STRSXP, data_size ) );
-
-	if( current_data_size > 0 ){
-	    int i,j,k;         
-	    for( i=0,k=0; i<current_data_size; i++){
-		for( j=0; j<DATA_ROWS; j++,k++){
-		    INTEGER( bigger )[k] = INTEGER(ParseState.data)[k] ;
-		}
-		SET_STRING_ELT( biggertext, i, STRING_ELT( ParseState.text, i ) );
-	    }
-	}
-	REPROTECT( ParseState.data = bigger, ParseState.DATA_INDEX ) ;
-	REPROTECT( ParseState.text = biggertext, ParseState.TEXT_INDEX ) ;
-	UNPROTECT( 2 ) ;
-	
+    R_PreserveObject( bigger = lengthgets2(ParseState.data, new_data_count * DATA_ROWS ) ) ; 
+    R_PreserveObject( biggertext = lengthgets2(ParseState.text, new_data_count ) );
+    R_ReleaseObject( ParseState.data );
+    R_ReleaseObject( ParseState.text );
+    ParseState.data = bigger;
+    ParseState.text = biggertext;
 }
 
 /**
@@ -3411,24 +3442,22 @@ static void growData(){
  */
 static void growID( int target ){
 	
-	SEXP newid ;
-	int current_id_size = ID_SIZE ;
-	int id_size;
-	id_size = target + NLINES * 15 ;
-	PROTECT( newid = allocVector( INTSXP, ( 1 + id_size ) * 2) ) ;
-	int i=0,j,k=0;
-	if( current_id_size > 0 ){ 
-		for( ; i<(current_id_size+1); i++){
-			for(j=0;j<2; j++,k++){
-				INTEGER( newid )[k] = INTEGER( ParseState.ids )[k] ;
-			}
-		}
-	}
-	for( ;i<(id_size+1);i++){
-		for(j=0;j<2; j++,k++){
-			INTEGER( newid )[k] = 0 ;
-		}
-	}
-	REPROTECT( ParseState.ids = newid, ParseState.ID_INDEX ) ;
-	UNPROTECT(1) ;
+    SEXP bigger;
+    int new_count;
+    if (!ParseState.ids) {
+        new_count = INIT_DATA_COUNT/2 - 1;
+        R_PreserveObject(ParseState.ids = allocVector(INTSXP, 0));
+    } else
+    	new_count = ID_COUNT;
+    	
+    while (target > new_count)
+    	new_count = 2*new_count + 1;
+    	
+    if (new_count <= ID_COUNT)
+    	return;
+    
+    int new_size = (1 + new_count)*2;
+    R_PreserveObject( bigger = lengthgets2(ParseState.ids, new_size ) );
+    R_ReleaseObject( ParseState.ids );
+    ParseState.ids = bigger;
 }

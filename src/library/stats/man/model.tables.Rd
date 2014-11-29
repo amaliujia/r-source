@@ -1,6 +1,6 @@
 % File src/library/stats/man/model.tables.Rd
 % Part of the R package, http://www.R-project.org
-% Copyright 1995-2007 R Core Team
+% Copyright 1995-2013 R Core Team
 % Distributed under GPL 2 or later
 
 \name{model.tables}
@@ -58,9 +58,6 @@ model.tables(x, \dots)
 }
 
 \examples{\donttest{
-## From Venables and Ripley (2002) p.165.
-utils::data(npk, package = "MASS")
-
 options(contrasts = c("contr.helmert", "contr.treatment"))
 npk.aov <- aov(yield ~ block + N*P*K, npk)
 model.tables(npk.aov, "means", se = TRUE)

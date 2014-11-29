@@ -1,9 +1,10 @@
 % File src/library/graphics/man/par.Rd
 % Part of the R package, http://www.R-project.org
-% Copyright 1995-2012 R Core Team
+% Copyright 1995-2013 R Core Team
 % Distributed under GPL 2 or later
 
 \newcommand{\CRANpkg}{\href{http://CRAN.R-project.org/package=#1}{\pkg{#1}}}
+\newcommand{\sspace}{\ifelse{latex}{\out{~}}{ }}
 
 \name{par}
 \alias{par}
@@ -59,6 +60,7 @@
 \concept{oma}
 \concept{omd}
 \concept{omi}
+\concept{page}
 \concept{pch}
 \concept{pin}
 \concept{plt}
@@ -126,8 +128,8 @@ par(\dots, no.readonly = FALSE)
 
   \emph{\bold{R.O.}} indicates \emph{\bold{read-only arguments}}: These
   may only be used in queries and cannot be set.  (\code{"cin"},
-  \code{"cra"}, \code{"csi"}, \code{"cxy"} and \code{"din"} are always
-  read-only.)
+  \code{"cra"}, \code{"csi"}, \code{"cxy"}, \code{"din"} and
+  \code{"page"} are always read-only.)
 
   Several parameters can only be set by a call to \code{par()}:
   \itemize{
@@ -168,7 +170,7 @@ par(\dots, no.readonly = FALSE)
 
   Note that graphical parameters are suggestions: plotting functions and
   devices need not make use of them (and this is particularly true of
-  non-default methods for e.g. \code{plot}).
+  non-default methods for e.g.\sspace{}\code{plot}).
 }
 
 \value{
@@ -234,7 +236,7 @@ par(\dots, no.readonly = FALSE)
     \item{\code{cex}}{A numerical value giving the amount by which
       plotting text and symbols should be magnified relative to the
       default.  This starts as \code{1} when a device is opened, and is
-      reset when the layout is changed, e.g. by setting \code{mfrow}.
+      reset when the layout is changed, e.g.\sspace{}by setting \code{mfrow}.
 
       Note that some graphics functions such as
       \code{\link{plot.default}} have an \emph{argument} of this name
@@ -472,6 +474,10 @@ par(\dots, no.readonly = FALSE)
       of the device region.}
     \item{\code{omi}}{A vector of the form \code{c(bottom, left, top,
         right)} giving the size of the outer margins in inches.}
+    \item{\code{page}}{\emph{\bold{R.O.}}; A boolean value indicating
+        whether the next call to \code{\link{plot.new}} is going
+        to start a new page.  This value may be \code{FALSE} if there
+        are multiple figures on the page.}
     \item{\code{pch}}{Either an integer specifying a symbol or a single
       character to be used as the default in plotting points.  See
       \code{\link{points}} for possible values and their interpretation.
@@ -729,10 +735,12 @@ showLty <- function(ltys, xoff = 0, ...) {
    plot(0:1, 0:1, type = "n", axes = FALSE, ann = FALSE)
    y <- (n:1)/(n+1)
    clty <- as.character(ltys)
-   mytext <- function(x,y, txt) text(x, y, txt, adj = c(0, -.3), cex = 0.8, ...)
+   mytext <- function(x, y, txt)
+      text(x, y, txt, adj = c(0, -.3), cex = 0.8, ...)
    abline(h = y, lty = ltys, ...); mytext(xoff, y, clty)
    y <- y - 1/(3*(n+1))
-   abline(h = y, lty = ltys, lwd = 2, ...); mytext(1/8+xoff, y, paste(clty," lwd = 2"))
+   abline(h = y, lty = ltys, lwd = 2, ...)
+   mytext(1/8+xoff, y, paste(clty," lwd = 2"))
 }
 showLty(c("solid", "dashed", "dotted", "dotdash", "longdash", "twodash"))
 par(new = TRUE)  # the same:

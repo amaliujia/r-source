@@ -1,6 +1,6 @@
 % File src/library/base/man/length.Rd
 % Part of the R package, http://www.R-project.org
-% Copyright 1995-2012 R Core Team
+% Copyright 1995-2014 R Core Team
 % Distributed under GPL 2 or later
 
 \newcommand{\CRANpkg}{\href{http://CRAN.R-project.org/package=#1}{\pkg{#1}}}
@@ -43,9 +43,9 @@ length(x) <- value
   For vectors (including lists) and factors the length is the number of
   elements.  For an environment it is the number of objects in the
   environment, and \code{NULL} has length 0.  For expressions and
-  pairlists (including language objects and dotlists) it is the length
-  of the pairlist chain.  All other objects (including functions) have
-  length one: note that for functions this differs from S.
+  pairlists (including \link{language objects} and dotlists) it is the
+  length of the pairlist chain.  All other objects (including functions)
+  have length one: note that for functions this differs from S.
 
   The replacement form removes all the attributes of \code{x} except its
   names, which are adjusted (and if necessary extended by \code{""}).
@@ -55,9 +55,9 @@ length(x) <- value
   Package authors have written methods that return a result of length
   other than one (\CRANpkg{Formula}) and that return a vector of type
   \code{\link{double}} (\CRANpkg{Matrix}), even with non-integer values
-  (earlier versions of \CRANpkg{sets}).  As from \R 2.15.2, where a
-  single double value is returned that can be represented as an integer
-  it is returned as a length-one integer vector.
+  (earlier versions of \CRANpkg{sets}). Where a single double value is
+  returned that can be represented as an integer it is returned as a
+  length-one integer vector.
 
   As from \R 3.0.0, lengths can be returned as double in base \R.
 }

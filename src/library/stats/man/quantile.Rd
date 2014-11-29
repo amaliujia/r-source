@@ -1,7 +1,9 @@
 % File src/library/stats/man/quantile.Rd
 % Part of the R package, http://www.R-project.org
-% Copyright 1995-2009 R Core Team
+% Copyright 1995-2013 R Core Team
 % Distributed under GPL 2 or later
+
+\newcommand{\sspace}{\ifelse{latex}{\out{~}}{ }}
 
 \name{quantile}
 \title{Sample Quantiles}
@@ -48,7 +50,7 @@ quantile(x, \dots)
   Note that as this is in a namespace, the copy of \code{sort} in
   \pkg{base} will be used, not some S4 generic of that name.  Also note
   that that is no check on the \sQuote{correctly}, and so
-  e.g. \code{quantile} can be applied to complex vectors which (apart
+  e.g.\sspace{}\code{quantile} can be applied to complex vectors which (apart
   from ties) will be ordered on their real parts.
 
   There is a method for the date-time classes (see
@@ -146,7 +148,7 @@ quantile(x, \dots)
   Wadsworth & Brooks/Cole.
 
   Hyndman, R. J. and Fan, Y. (1996) Sample quantiles in statistical
-  packages, \emph{American Statistician}, \bold{50}, 361--365.
+  packages, \emph{American Statistician} \bold{50}, 361--365.
 }
 \seealso{
   \code{\link{ecdf}} for empirical distributions of which

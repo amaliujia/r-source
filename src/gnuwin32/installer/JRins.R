@@ -28,7 +28,9 @@
 
     Rver <- readLines("../../../VERSION")[1L]
     Rver <- sub("Under .*$", "Pre-release", Rver)
+    ## This is now over 2^16, so truncate
     SVN <- sub("Revision: ", "", readLines("../../../SVN-REVISION"))[1L]
+    SVN <- as.character(as.numeric(SVN) - 50000L)
     Rver0 <- paste(sub(" .*$", "", Rver), SVN, sep = ".")
 
 
@@ -51,7 +53,7 @@
         paste("AppVersion=", Rver, sep = ""),
         paste("VersionInfoVersion=", Rver0, sep = ""),
         paste("DefaultDirName={code:UserPF}\\R\\", RW, sep = ""),
-        paste("InfoBeforeFile=", srcdir, "\\COPYING", sep = ""),
+        paste("InfoBeforeFile=", srcdir, "\\doc\\COPYING", sep = ""),
         if(Producer == "R-core") "AppPublisher=R Core Team"
         else paste("AppPublisher=", Producer, sep = ""),
         file = con, sep = "\n")

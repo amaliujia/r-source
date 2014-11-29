@@ -1,7 +1,7 @@
 #  File src/library/stats/R/nafns.R
 #  Part of the R package, http://www.R-project.org
 #
-#  Copyright (C) 1995-2012 The R Core Team
+#  Copyright (C) 1995-2013 The R Core Team
 #
 #  This program is free software; you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
@@ -61,7 +61,7 @@ na.omit.data.frame <- function(object, ...)
 {
     ## Assuming a data.frame like object
     n <- length(object)
-    omit <- FALSE
+    omit <- logical(nrow(object))
     vars <- seq_len(n)
     for(j in vars) {
 	x <- object[[j]]
@@ -115,7 +115,7 @@ na.exclude.data.frame <- function(object, ...)
 {
     ## Assuming a data.frame like object
     n <- length(object)
-    omit <- FALSE
+    omit <- logical(nrow(object))
     vars <- seq_len(n)
     for(j in vars) {
 	x <- object[[j]]

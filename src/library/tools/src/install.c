@@ -1,6 +1,6 @@
 /*
  *  R : A Computer Language for Statistical Data Analysis
- *  Copyright (C) 1998--2012 The R Core Team
+ *  Copyright (C) 1998--2013 The R Core Team
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -24,6 +24,14 @@
 #endif
 
 #include <Defn.h>
+#undef _
+#ifdef ENABLE_NLS
+#include <libintl.h>
+#define _(String) dgettext ("tools", String)
+#else
+#define _(String) (String)
+#endif
+
 #ifdef HAVE_SYS_TYPES_H
 # include <sys/types.h>
 #endif
@@ -42,7 +50,7 @@
 #endif
 static const char  * const R_FileSep = FILESEP;
 
-static void chmod_one(const char *name)
+static void chmod_one(const char *name, const int grpwrt)
 {
     DIR *dir;
     struct dirent *de;
@@ -53,8 +61,14 @@ static void chmod_one(const char *name)
     struct stat sb;
 #endif
 #ifndef Win32
-    mode_t mask = S_IRUSR | S_IRGRP | S_IROTH | S_IWUSR, /* 0644 */
-	dirmask = mask | S_IXUSR | S_IXGRP | S_IXOTH; /* 0755 */
+    mode_t mask, dirmask;
+    if (grpwrt) {
+	mask = S_IRUSR | S_IRGRP | S_IROTH | S_IWUSR | S_IWGRP; /* 0664 */
+	dirmask = mask | S_IXUSR | S_IXGRP | S_IXOTH;           /* 0755 */
+    } else {
+	mask = S_IRUSR | S_IRGRP | S_IROTH | S_IWUSR;           /* 0644 */
+	dirmask = mask | S_IXUSR | S_IXGRP | S_IXOTH;           /* 0755 */
+    }
 #endif
 
     if (streql(name, ".") || streql(name, "..")) return;
@@ -79,7 +93,7 @@ static void chmod_one(const char *name)
 		    snprintf(p, PATH_MAX, "%s%s", name, de->d_name);
 		else
 		    snprintf(p, PATH_MAX, "%s%s%s", name, R_FileSep, de->d_name);
-		chmod_one(p);
+		chmod_one(p, grpwrt);
 	    }
 	    closedir(dir);
 	} else { 
@@ -89,12 +103,14 @@ static void chmod_one(const char *name)
 }
 
 /* recursively fix up permissions: used for R CMD INSTALL and build.
+   'gwsxp' means set group-write permissions on directories.
    NB: this overrides umask. */
-SEXP dirchmod(SEXP dr)
+/* This is a .Call so manages R_alloc stack */
+SEXP dirchmod(SEXP dr, SEXP gwsxp)
 {
     if(!isString(dr) || length(dr) != 1)
 	error(_("invalid '%s' argument"), "dir");
-    chmod_one(translateChar(STRING_ELT(dr, 0)));
+    chmod_one(translateChar(STRING_ELT(dr, 0)), asLogical(gwsxp));
 
     return R_NilValue;
 }

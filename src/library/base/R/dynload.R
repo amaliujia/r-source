@@ -1,7 +1,7 @@
 #  File src/library/base/R/dynload.R
 #  Part of the R package, http://www.R-project.org
 #
-#  Copyright (C) 1995-2012 The R Core Team
+#  Copyright (C) 1995-2013 The R Core Team
 #
 #  This program is free software; you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
@@ -88,7 +88,7 @@ getDLLRegisteredRoutines.character <- function(dll, addNames = TRUE)
         stop(gettextf("No DLL currently loaded with name or path %s", sQuote(dll)),
              domain = NA)
 
-    dll <- which(w)[1L]
+    dll <- which.max(w)
     if(sum(w) > 1L)
         warning(gettextf("multiple DLLs match '%s'. Using '%s'",
                          dll, dll[["path"]]), domain = NA)
@@ -147,10 +147,10 @@ function(x, ...)
     d <- list()
     sapply(names(x),
              function(id) {
-                d[[id]] <<- rep("", n)
-                names <- sapply(x[[id]], function(x) x$name)
+		d[[id]] <<- rep.int("", n)
+		names <- vapply(x[[id]], function(x) x$name, "")
                 if(length(names)) d[[id]][seq_along(names)] <<- names
-                d[[paste(id, "numParameters")]] <<- rep("", n)
+                d[[paste(id, "numParameters")]] <<- rep.int("", n)
                 names <- sapply(x[[id]], function(x) x$numParameters)
                 if(length(names))
                     d[[paste(id, "numParameters")]][seq_along(names)] <<- names

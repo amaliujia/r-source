@@ -1,7 +1,7 @@
 /*
  *  R : A Computer Language for Statistical Data Analysis
  *  Copyright (C) 1995, 1996  Robert Gentleman and Ross Ihaka
- *  Copyright (C) 1997--2012  The R Core Team
+ *  Copyright (C) 1997--2013  The R Core Team
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -98,7 +98,6 @@ void R_setStartTime(void); /* in sys-unix.c */
 /*  used here and in main/sysutils.c (for system). */
 Rboolean useaqua = FALSE;
 
-// This should have been fixed a long time ago ....
 // Finally in Sep 2012 R.app sets ptr_R_FlushConsole
 #include <R_ext/Rdynload.h>
 DL_FUNC ptr_do_flushconsole;
@@ -149,6 +148,9 @@ extern void BindDomain(char *R_Home);
 /* In src/main/main.c, to avoid inlining */
 extern uintptr_t dummy_ii(void);
 
+/* Protection against embedded misuse, PR#15420 */
+static int num_initialized = 0;
+
 int Rf_initialize_R(int ac, char **av)
 {
     int i, ioff = 1, j;
@@ -157,6 +159,11 @@ int Rf_initialize_R(int ac, char **av)
     structRstart rstart;
     Rstart Rp = &rstart;
     Rboolean force_interactive = FALSE;
+
+    if (num_initialized++) {
+	fprintf(stderr, "%s", "R is already initialized\n");
+	exit(1);
+    }
 
 
 #if defined(HAVE_SYS_RESOURCE_H) && defined(HAVE_GETRLIMIT)

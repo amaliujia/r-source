@@ -1,7 +1,7 @@
 #  File src/library/base/R/warnings.R
 #  Part of the R package, http://www.R-project.org
 #
-#  Copyright (C) 1995-2012 The R Core Team
+#  Copyright (C) 1995-2013 The R Core Team
 #
 #  This program is free software; you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
@@ -23,6 +23,14 @@ warnings <- function(...)
     if(!(n <- length(last.warning))) return()
     structure(last.warning, dots=list(...), class="warnings")
 }
+
+`[.warnings` <- function(x, ...)
+    structure(NextMethod("["), class="warnings")
+c.warnings <- function (..., recursive = FALSE)
+    structure(NextMethod("c"), class = "warnings")
+
+unique.warnings <- function(x, incomparables = FALSE, ...)
+    x[!duplicated(x, incomparables, ...)]
 
 print.warnings <- function(x, ...)
 {

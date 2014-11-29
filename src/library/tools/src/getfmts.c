@@ -1,6 +1,6 @@
 /*
  *  R : A Computer Language for Statistical Data Analysis
- *  Copyright (C) 2002--2012     The R Core Team
+ *  Copyright (C) 2002--2013     The R Core Team
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -26,6 +26,15 @@
 #include <Defn.h>
 #include "RBufferUtils.h"
 
+#undef _
+#ifdef ENABLE_NLS
+#include <libintl.h>
+#define _(String) dgettext ("tools", String)
+#else
+#define _(String) (String)
+#endif
+
+
 #define MAXLINE MAXELTSIZE
 #define MAXNARGS 100
 /*               ^^^ not entirely arbitrary, but strongly linked to allowing %$1 to %$99 !*/
@@ -44,6 +53,7 @@ SEXP getfmts(SEXP format)
 
     int nthis, nstar;
     Rboolean use_UTF8;
+    const void *vmax = vmaxget();
     
     SEXP res = PROTECT(allocVector(STRSXP, MAXNARGS));
     
@@ -147,6 +157,7 @@ SEXP getfmts(SEXP format)
     }  /* end for ( each chunk ) */
 
     res = xlengthgets(res, maxlen);
+    vmaxset(vmax);
     UNPROTECT(1);
     return res;
 }

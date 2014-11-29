@@ -1,6 +1,6 @@
 
-R version 3.0.0 RC (2013-03-29 r62438) -- "Masked Marvel"
-Copyright (C) 2013 The R Foundation for Statistical Computing
+R version 3.1.2 RC (2014-10-29 r66897) -- "Pumpkin Helmet"
+Copyright (C) 2014 The R Foundation for Statistical Computing
 Platform: x86_64-unknown-linux-gnu (64-bit)
 
 R is free software and comes with ABSOLUTELY NO WARRANTY.
@@ -18,6 +18,7 @@ Type 'q()' to quit R.
 > ####--- S4 Methods (and Classes)  --- see also ../src/library/methods/tests/
 > options(useFancyQuotes=FALSE)
 > require(methods)
+> assertError <- tools::assertError # "import"
 > ##too fragile: showMethods(where = "package:methods")
 > 
 > ##-- S4 classes with S3 slots [moved from ./reg-tests-1.R]
@@ -269,15 +270,6 @@ Slot "y":
 > setMethod("Logic", signature("ANY", "brob"), logic2)
 [1] "Logic"
 > ## Now ensure that using group members gives error:
-> assertError <- function(expr)
-+     stopifnot(inherits(try(expr, silent = TRUE), "try-error"))
-> assertWarning <- function(expr)
-+     stopifnot(inherits(tryCatch(expr, warning = function(w)w), "warning"))
-> assertWarning_atleast <- function(expr) {
-+     r <- tryCatch(expr, warning = function(w)w, error = function(e)e)
-+     stopifnot(inherits(r, "warning") || inherits(r, "error"))
-+ }
-> 
 > assertError(b & b)
 Note: method with signature 'brob#ANY' chosen for function '&',
  target signature 'brob#brob'.
@@ -645,9 +637,9 @@ Creating a generic function for 'as.vector' from package 'base' in the global en
 > setGeneric("test1", function(x, printit = TRUE, name = "tmp")
 +            standardGeneric("test1"))
 [1] "test1"
-> assertWarning_atleast(
-+ setMethod("test1", "numeric", function(x, name, printit) match.call())
-+ )## did not warn or error in R 2.7.0 and earlier
+> tools::assertCondition(
++ setMethod("test1", "numeric", function(x, name, printit) match.call()),
++ "warning", "error")## did not warn or error in R 2.7.0 and earlier
 > 
 > library(stats4)
 > c1 <- getClass("mle", where = "stats4")
@@ -865,10 +857,108 @@ Creating a new generic function for 'qqplot' in the global environment
 [1] "length"
 > setMethod(`[[`,   "A", function(x, i, j, ...) x@aa[[i]])
 [1] "[["
+> setMethod(`[`,    "A", function(x, i, j, ...) new("A", aa = x@aa[i]))
+[1] "["
 > stopifnot(length(a) == 6, identical(a[[5]], aa[[5]]),
++           identical(a, rev(rev(a))), # using '['
 + 	  identical(mapply(`*`, aa, rep(1:3, 2)),
 + 		    mapply(`*`, a,  rep(1:3, 2))))
 > ## Up to R 2.15.2, internally 'a' is treated as if it was of length 1
 > ## because internal dispatch did not work for length().
 > 
+> ## is.unsorted() for formal classes - and R > 3.0.0 :
+> ## Fails, unfortunately (from C, base::.gtn() is called w/o dispatch)
+> ## setMethod("anyNA", "A", function(x) anyNA(x@aa))
+> ## setMethod(".gtn", "A", function(x,strictly) .gtn(x@aa, strictly))
+> ## but this now works (thanks to DispatchOrEval() ):
+> setMethod("is.unsorted", "A", function(x, na.rm=FALSE, strictly=FALSE)
++     is.unsorted(x@aa, na.rm=na.rm, strictly=strictly))
+Creating a generic function for 'is.unsorted' from package 'base' in the global environment
+[1] "is.unsorted"
+> 
+> stopifnot(!is.unsorted(a), # 11:16 *is* sorted
++ 	  is.unsorted(rev(a)))
+> 
+> # getSrcref failed when rematchDefinition was used
+> text <- '
++ setClass("MyClass", representation(val = "numeric"))
++ setMethod("plot", signature(x = "MyClass"),
++     function(x, y, ...) {
++         # comment
++ 	NULL
++     })
++ setMethod("initialize", signature = "MyClass",
++     function(.Object, value) {
++ 	# comment
++ 	.Object@val <- value
++ 	return(.Object)
++     })
++ '
+> source(textConnection(text), keep.source = TRUE)
+> getSrcref(getMethod("plot", "MyClass"))
+function(x, y, ...) {
+        # comment
+	NULL
+    }
+> getSrcref(getMethod("initialize", "MyClass"))
+function(.Object, value) {
+	# comment
+	.Object@val <- value
+	return(.Object)
+    }
+> 
+> 
+> ## PR#15691
+> setGeneric("fun", function(x, ...) standardGeneric("fun"))
+[1] "fun"
+> setMethod("fun", "character", identity)
+[1] "fun"
+> setMethod("fun", "numeric", function(x) {
++   x <- as.character(x)
++   callGeneric()
++ })
+[1] "fun"
+> 
+> stopifnot(identical(fun(1), do.call(fun, list(1))))
+> ## failed in R < 3.1.0
+> 
+> 
+> ## PR#15680
+> setGeneric("f", function(x, y) standardGeneric("f"))
+[1] "f"
+> setMethod("f", c("numeric", "missing"), function(x, y) x)
+[1] "f"
+> try(?f(1))
+Error in .helpForCall(topicExpr, parent.frame()) : 
+  no documentation for function 'f' and signature 'x = "numeric", y = "missing"'
+> 
+> ## "..." is not handled
+> setGeneric("f", function(...) standardGeneric("f"))
+[1] "f"
+> setMethod("f", "numeric", function(...) c(...))
+[1] "f"
+> try(?f(1,2))
+Error in .helpForCall(topicExpr, parent.frame()) : 
+  no documentation for function 'f' and signature '... = "numeric"'
+> 
+> ## defaults in the generic formal arguments are not considered
+> setGeneric("f", function(x, y=0) standardGeneric("f"))
+[1] "f"
+> setMethod("f", c("numeric", "numeric"), function(x, y) x+y)
+[1] "f"
+> try(?f(1))
+Error in .helpForCall(topicExpr, parent.frame()) : 
+  no documentation for function 'f' and signature 'x = "numeric", y = "numeric"'
+> 
+> ## Objects with S3 classes fail earlier
+> setGeneric("f", function(x) standardGeneric("f"))
+[1] "f"
+> setMethod("f", "numeric", function(x) x)
+[1] "f"
+> setOldClass(c("foo", "numeric"))
+> n <- structure(1, class=c("foo", "numeric"))
+> try(?f(n))
+Error in .helpForCall(topicExpr, parent.frame()) : 
+  no documentation for function 'f' and signature 'x = "numeric"'
+> ## different failures in R < 3.1.0.
 > 

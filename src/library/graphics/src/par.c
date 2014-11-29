@@ -1,7 +1,7 @@
 /*
  *  R : A Computer Language for Statistical Data Analysis
  *  Copyright (C) 1995, 1996  Robert Gentleman and Ross Ihaka
- *  Copyright (C) 1997--2013  The R Core Team.
+ *  Copyright (C) 1997--2014  The R Core Team.
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -109,6 +109,7 @@ ParTable  [] = {
     { "oma",		 1 },
     { "omd",		 1 },
     { "omi",		 1 },
+    { "page",            2 },
     { "pch",		 0 },
     { "pin",		 1 },
     { "plt",		 1 },
@@ -583,8 +584,8 @@ static void Specify(const char *what, SEXP value, pGEDevDesc dd)
 	if (gpptr(dd)->xlog) {
 	    R_DEV_2(logusr[0]) = REAL(value)[0];
 	    R_DEV_2(logusr[1]) = REAL(value)[1];
-	    R_DEV_2(usr[0]) = pow(10., REAL(value)[0]);
-	    R_DEV_2(usr[1]) = pow(10., REAL(value)[1]);
+	    R_DEV_2(usr[0]) = Rexp10(REAL(value)[0]);
+	    R_DEV_2(usr[1]) = Rexp10(REAL(value)[1]);
 	}
 	else {
 	    R_DEV_2(usr[0]) = REAL(value)[0];
@@ -595,8 +596,8 @@ static void Specify(const char *what, SEXP value, pGEDevDesc dd)
 	if (gpptr(dd)->ylog) {
 	    R_DEV_2(logusr[2]) = REAL(value)[2];
 	    R_DEV_2(logusr[3]) = REAL(value)[3];
-	    R_DEV_2(usr[2]) = pow(10., REAL(value)[2]);
-	    R_DEV_2(usr[3]) = pow(10., REAL(value)[3]);
+	    R_DEV_2(usr[2]) = Rexp10(REAL(value)[2]);
+	    R_DEV_2(usr[3]) = Rexp10(REAL(value)[3]);
 	}
 	else {
 	    R_DEV_2(usr[2]) = REAL(value)[2];
@@ -914,6 +915,20 @@ static SEXP Query(const char *what, pGEDevDesc dd)
 	REAL(value)[1] = dpptr(dd)->omi[1];
 	REAL(value)[2] = dpptr(dd)->omi[2];
 	REAL(value)[3] = dpptr(dd)->omi[3];
+    }
+    else if (streql(what, "page")) {
+        /* This calculation mimics the decision-making in GNewPlot()
+         * in graphics.c SO it MUST be kept in synch with the logic there
+         */
+        value = allocVector(LGLSXP, 1);
+        LOGICAL(value)[0] = 0;
+        if (dpptr(dd)->new) {
+            if (!dpptr(dd)->state) 
+                LOGICAL(value)[0] = 1;
+        } else {
+            if (dpptr(dd)->currentFigure + 1 > dpptr(dd)->lastFigure) 
+                LOGICAL(value)[0] = 1;
+        }
     }
     else if (streql(what, "pch")) {
 	int val = dpptr(dd)->pch;

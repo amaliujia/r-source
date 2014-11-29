@@ -1,7 +1,9 @@
 % File src/library/base/man/dimnames.Rd
 % Part of the R package, http://www.R-project.org
-% Copyright 1995-2012 R Core Team
+% Copyright 1995-2013 R Core Team
 % Distributed under GPL 2 or later
+
+\newcommand{\sspace}{\ifelse{latex}{\out{~}}{ }}
 
 \name{dimnames}
 \title{Dimnames of an Object}
@@ -73,7 +75,7 @@ provideDimnames(x, sep = "", base = list(LETTERS))
   values.
 
   \code{provideDimnames(x)} returns \code{x}, with \dQuote{\code{NULL} -
-    free} \code{dimnames}, i.e. each component a character vector of
+    free} \code{dimnames}, i.e.\sspace{}each component a character vector of
   correct length.
 }
 \note{
@@ -102,7 +104,6 @@ colnames0 <- function(x) dimnames(x)[[2]]
 A0 <- A; dimnames(A)[2:3] <- list(NULL)
 stopifnot(identical(A0, provideDimnames(A)))
 strd <- function(x) utils::str(dimnames(x))
-strd(provideDimnames(A, base= list(letters[-(1:9)], tail(LETTERS))))
 strd(provideDimnames(A, base= list(letters[-(1:9)], tail(LETTERS))))
 strd(provideDimnames(N, base= list(letters[-(1:9)], tail(LETTERS)))) # recycling
 strd(provideDimnames(A, base= list(c("AA","BB")))) # recycling on both levels

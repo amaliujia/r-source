@@ -1,7 +1,7 @@
 #  File src/library/utils/R/packages2.R
 #  Part of the R package, http://www.R-project.org
 #
-#  Copyright (C) 1995-2013 The R Core Team
+#  Copyright (C) 1995-2014 The R Core Team
 #
 #  This program is free software; you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
@@ -16,8 +16,12 @@
 #  A copy of the GNU General Public License is available at
 #  http://www.r-project.org/Licenses/
 
+if (.Platform$OS.type == "windows")
+    .install.macbinary <- function(...) NULL	# globalVariables isn't available, so use this to suppress the warning
+
 getDependencies <-
-    function(pkgs, dependencies = NA, available = NULL, lib = .libPaths()[1L])
+    function(pkgs, dependencies = NA, available = NULL, lib = .libPaths()[1L],
+             binary = FALSE)
 {
     if (is.null(dependencies)) return(unique(pkgs))
     oneLib <- length(lib) == 1L
@@ -27,8 +31,13 @@ getDependencies <-
     depends <-
         is.character(dependencies) || (is.logical(dependencies) && dependencies)
     if(depends && is.logical(dependencies)) {
-        dependencies <-  c("Depends", "Imports", "LinkingTo", "Suggests")
-        dep2 <- c("Depends", "Imports", "LinkingTo")
+        if(binary) {
+            dependencies <-  c("Depends", "Imports", "Suggests")
+            dep2 <- c("Depends", "Imports")
+        } else {
+            dependencies <-  c("Depends", "Imports", "LinkingTo", "Suggests")
+            dep2 <- c("Depends", "Imports", "LinkingTo")
+        }
     }
     if(depends && !oneLib) {
         warning("Do not know which element of 'lib' to install dependencies into\nskipping dependencies")
@@ -131,7 +140,7 @@ install.packages <-
     get_package_name <- function(pkg) {
         ## Since the pkg argument can be the name of a file rather than
         ## a regular package name, we have to clean that up.
-        gsub("_\\.(zip|tar\\.gz)", "",
+        gsub("_[.](zip|tar[.]gz|tar[.]bzip2|tar[.]xz)", "",
              gsub(.standard_regexps()$valid_package_version, "",
                   basename(pkg)))
     }
@@ -140,13 +149,12 @@ install.packages <-
     {
         if(.Platform$OS.type == "windows") return(character())
 
-        pkg <- get_package_name(pkg)
-
         if(length(pkgs) == 1L && length(configure.args) &&
            length(names(configure.args)) == 0L)
             return(paste0("--configure-args=",
                           shQuote(paste(configure.args, collapse = " "))))
 
+        pkg <- get_package_name(pkg)
         if (length(configure.args) && length(names(configure.args))
               && pkg %in% names(configure.args))
             config <- paste0("--configure-args=",
@@ -161,13 +169,12 @@ install.packages <-
     {
         if(.Platform$OS.type == "windows") return(character())
 
-        pkg <- get_package_name(pkg)
-
         if(length(pkgs) == 1L && length(configure.vars) &&
            length(names(configure.vars)) == 0L)
             return(paste0("--configure-vars=",
                           shQuote(paste(configure.vars, collapse = " "))))
 
+        pkg <- get_package_name(pkg)
         if (length(configure.vars) && length(names(configure.vars))
               && pkg %in% names(configure.vars))
             config <- paste0("--configure-vars=",
@@ -248,6 +255,7 @@ install.packages <-
                 ##' returns "no" for "no",  otherwise 'ans', a string
 		msg <- gettext(msg)
 		if(.Platform$OS.type == "windows") {
+                    flush.console() # so warning is seen
 		    ans <- winDialog("yesno", sprintf(msg, sQuote(userdir)))
 		    if(ans != "YES") "no" else ans
 		} else {
@@ -272,16 +280,44 @@ install.packages <-
 
     lib <- normalizePath(lib)
 
-    ## check if we should infer repos=NULL
+    ## check if we should infer repos = NULL
     if(length(pkgs) == 1L && missing(repos) && missing(contriburl)) {
-        if((type == "source" && length(grep("\\.tar.gz$", pkgs))) ||
-           (type %in% "win.binary" && length(grep("\\.zip$", pkgs))) ||
+        if((type == "source" &&
+            any(grepl("[.]tar[.](gz|bz2|xz)$", pkgs))) ||
+           (type %in% "win.binary" && length(grep("[.]zip$", pkgs))) ||
            (substr(type, 1L, 10L) == "mac.binary"
-            && length(grep("\\.tgz$", pkgs)))) {
+            && length(grep("[.]tgz$", pkgs)))) {
             repos <- NULL
-            message("inferring 'repos = NULL' from the file name")
+            message("inferring 'repos = NULL' from 'pkgs'")
         }
     }
+
+    if(is.null(repos) & missing(contriburl)) {
+        tmpd <- destdir
+        nonlocalrepos <- any(web <- grepl("^(http|https|ftp)://", pkgs))
+        if(is.null(destdir) && nonlocalrepos) {
+            tmpd <- file.path(tempdir(), "downloaded_packages")
+            if (!file.exists(tmpd) && !dir.create(tmpd))
+                stop(gettextf("unable to create temporary directory %s",
+                              sQuote(tmpd)),
+                     domain = NA)
+        }
+        if(nonlocalrepos) {
+            urls <- pkgs[web]
+            for (p in unique(urls)) {
+                this <- pkgs == p
+                destfile <- file.path(tmpd, basename(p))
+                res <- try(download.file(p, destfile, method, mode="wb", ...))
+                if(!inherits(res, "try-error") && res == 0L)
+                    pkgs[this] <- destfile
+                else {
+                    ## There will be enough notification from the try()
+                    pkgs[this] <- NA
+                }
+           }
+        }
+    }
+
 
 # for testing .Platform$pkgType <- "mac.binary.leopard"
     ## Look at type == "both"
@@ -386,8 +422,10 @@ install.packages <-
             contriburl2 <- contrib.url(repos, "source")
 	    # The line above may have changed the repos option, so..
             if (missing(repos)) repos <- getOption("repos")
-            av1 <- try(suppressWarnings(available.packages(contriburl = contriburl2, method = method)), silent = TRUE)
-            if(inherits(av1, "try-error")) {
+	    av1 <- tryCatch(suppressWarnings(
+			available.packages(contriburl = contriburl2, method = method)),
+			    error = function(e)e)
+	    if(inherits(av1, "error")) {
                 message("source repository is unavailable to check versions")
                 available <-
                     available.packages(contriburl = contrib.url(repos, type), method = method)
@@ -543,25 +581,25 @@ install.packages <-
         ## install from local source tarball(s)
         update <- cbind(path.expand(pkgs), lib) # for side-effect of recycling to same length
 
-        for(i in seq_len(nrow(update))) {
-            args <- c(args0,
-                      get_install_opts(update[i, 1L]),
-                      "-l", shQuote(update[i, 2L]),
-                      getConfigureArgs(update[i, 1L]),
-                      getConfigureVars(update[i, 1L]),
-                      shQuote(update[i, 1L]))
-            status <- system2(cmd0, args, env = env,
-                              stdout = output, stderr = output)
-            if(status > 0L)
-                warning(gettextf("installation of package %s had non-zero exit status",
-                                 sQuote(update[i, 1L])),
-                        domain = NA)
-            else if(verbose) {
-                cmd <- paste(c(cmd0, args), collapse = " ")
-                message(sprintf("%d): succeeded '%s'", i, cmd),
-                        domain = NA)
-            }
-        }
+       for(i in seq_len(nrow(update))) {
+           if (is.na(update[i, 1L])) next
+           args <- c(args0,
+                     get_install_opts(update[i, 1L]),
+                     "-l", shQuote(update[i, 2L]),
+                     getConfigureArgs(update[i, 1L]),
+                     getConfigureVars(update[i, 1L]),
+                     shQuote(update[i, 1L]))
+           status <- system2(cmd0, args, env = env,
+                             stdout = output, stderr = output)
+           if(status > 0L)
+               warning(gettextf("installation of package %s had non-zero exit status",
+                                sQuote(update[i, 1L])),
+                       domain = NA)
+           else if(verbose) {
+               cmd <- paste(c(cmd0, args), collapse = " ")
+               message(sprintf("%d): succeeded '%s'", i, cmd), domain = NA)
+           }
+       }
         return(invisible())
     }
 
@@ -665,10 +703,10 @@ install.packages <-
             if(status > 0L) {
                 ## Try to figure out which
                 pkgs <- update[, 1L]
-                tss <- sub("\\.ts$", "", dir(".", pattern = "\\.ts$"))
+                tss <- sub("[.]ts$", "", dir(".", pattern = "[.]ts$"))
                 failed <- pkgs[!pkgs %in% tss]
 		for (pkg in failed) system(paste0("cat ", pkg, ".out"))
-                warning(gettextf("installation of one of more packages failed,\n  probably %s",
+                warning(gettextf("installation of one or more packages failed,\n  probably %s",
                                  paste(sQuote(failed), collapse = ", ")),
                         domain = NA)
             }
@@ -720,8 +758,14 @@ install.packages <-
 }
 
 ## treat variables as global in a package, for codetools & check
-globalVariables <- function(names, package, add = TRUE) {
-    .listFile <- ".__global__"
+globalVariables <- function(names, package, add = TRUE)
+    registerNames(names, package, ".__global__", add)
+
+## suppress foreign function checks, for check
+suppressForeignCheck <- function(names, package, add = TRUE)
+    registerNames(names, package, ".__suppressForeign__", add)
+
+registerNames <- function(names, package, .listFile, add = TRUE) {
     .simplePackageName <- function(env) {
         if(exists(".packageName", envir = env, inherits = FALSE))
            get(".packageName", envir = env)
@@ -729,7 +773,7 @@ globalVariables <- function(names, package, add = TRUE) {
             "(unknown package)"
     }
     if(missing(package)) {
-        env <- topenv(parent.frame())
+        env <- topenv(parent.frame(2L)) # We cannot be called directly!
         package <- .simplePackageName(env)
     }
     else if(is.environment(package)) {

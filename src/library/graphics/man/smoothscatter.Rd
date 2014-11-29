@@ -1,6 +1,6 @@
 % File src/library/graphics/man/smoothscatter.Rd
 % Part of the R package, http://www.R-project.org
-% Copyright 1995-2011 R Core Team
+% Copyright 1995-2013 R Core Team
 % Distributed under GPL 2 or later
 
 \newcommand{\CRANpkg}{\href{http://CRAN.R-project.org/package=#1}{\pkg{#1}}}
@@ -72,7 +72,7 @@ smoothScatter(x, y = NULL, nbin = 128, bandwidth,
   regression smoother to a scatter plot.
 }
 \author{Florian Hahne at FHCRC, originally}
-\examples{
+\examples{\donttest{
 ## A largish data set
 n <- 10000
 x1  <- matrix(rnorm(n), ncol = 2)
@@ -98,5 +98,5 @@ y[, c(2,4)] <-  -y[, c(2,4)]
 pairs(y, panel = function(...) smoothScatter(..., nrpoints = 0, add = TRUE))
 
 par(oldpar)
-}
+}}
 \keyword{hplot}

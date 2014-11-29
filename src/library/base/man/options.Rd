@@ -1,13 +1,22 @@
 % File src/library/base/man/options.Rd
 % Part of the R package, http://www.R-project.org
-% Copyright 1995-2013 R Core Team
+% Copyright 1995-2014 R Core Team
 % Distributed under GPL 2 or later
+
+\newcommand{\sspace}{\ifelse{latex}{\out{~}}{ }}
 
 \name{options}
 \alias{options}
 \alias{.Options}
 \alias{getOption}
 \alias{option} % so help files can do 'set \link{} \code{"foo"}'
+
+\alias{MC_CORES}
+\alias{R_C_BOUNDS_CHECK}
+\alias{R_DEFAULT_DEVICE}
+\alias{R_KEEP_PKG_SOURCE}
+\alias{R_INTERACTIVE_DEVICE}
+
 \title{Options Settings}
 \description{
   Allow the user to set and examine a variety of global \emph{options}
@@ -23,27 +32,31 @@ getOption(x, default = NULL)
 %%-- NOTE : Keep the list up-to-date,
 %%-- ====   Consider also the leading comments in ../../../main/options.c
 \arguments{
-  \item{\dots}{any options can be defined, using \code{name = value} or
-    by passing a list of such tagged values.  However, only the ones
-    below are used in base \R.
-    Further, \code{options('name') == options()['name']}, see the example.
+  \item{\dots}{any options can be defined, using \code{name = value}.
+    However, only the ones below are used in base \R.
+    
+    Options can also be passed by giving a single unnamed argument which
+    is a named list.
   }
   \item{x}{a character string holding an option name.}
-
+  
   \item{default}{if the specified option is not set in the options list,
-     this value is returned.  This facilitates retrieving an option and
-     checking whether it is set and setting it separately if not.}
- }
+    this value is returned.  This facilitates retrieving an option and
+    checking whether it is set and setting it separately if not.}
+}
 \details{
   Invoking \code{options()} with no arguments returns a list with the
   current values of the options.  Note that not all options listed below
   are set initially.  To access the value of a single option, one should
-  use \code{getOption("width")}, e.g., rather than
+  use, e.g., \code{getOption("width")} rather than
   \code{options("width")} which is a \emph{list} of length one.
+}
 
-  \code{.Options} also always contains the \code{options()} list (as a
-  pairlist, unsorted), for S compatibility.  Assigning to it will make a
-  local copy and not change the original.
+\note{
+  For compatibility with S there is a visible object \code{.Options} whose
+  value is a pairlist containing  the current \code{options()} (in no
+  particular order).  Assigning to it will make a local copy and not
+  change the original.
 }
 \value{
   For \code{getOption}, the current value set for option \code{x}, or
@@ -175,16 +188,19 @@ getOption(x, default = NULL)
       \code{max.print} \emph{entries}.}
 
     \item{\code{OutDec}:}{character string containing a single-byte
-      character.  The character to be used as the decimal point in output
-      conversions, that is in printing, plotting and \code{as.character}
-      but not deparsing.}
+      character.  The preferred character to be used as the decimal
+      point in output conversions, that is in printing, plotting,
+      \code{\link{format}} and \code{\link{as.character}} but not when
+      deparsing nor by \code{\link{sprintf}} nor \code{\link{formatC}}
+      (which are sometimes used prior to printing.}
 
     \item{\code{pager}:}{the command used for displaying text files by
       \code{\link{file.show}}.
 #ifdef unix
-      Defaults to \file{\var{\link{R_HOME}}/bin/pager},
-      which selects a pager via the \env{PAGER} environment variable
-      (and that usually defaults to \code{less}).
+      Defaults to \file{\var{\link{R_HOME}}/bin/pager}, which is a shell
+      script running the command-line specified by the environment
+      variable \env{PAGER} whose default is set at configuration,
+      usually to \command{less}.
 #endif
 #ifdef windows
       Defaults to \code{"internal"}, which uses a pager similar to the
@@ -232,14 +248,13 @@ getOption(x, default = NULL)
       % verbatim, for checking " \t\n\"\\'`><=%;,|&{()}"
 #ifdef unix
     \item{\code{rl_word_breaks}:}{Used for the readline-based terminal
-      interface.  Default value \code{" \\t\\n\\"\\\\'`><=\%;,|&\{()\}"}.%"
-      This is the set of characters use to break the input line up into
+      interface.  Default value \code{" \\t\\n\\"\\\\'`><=\%;,|&{()}"}.%"
+	
+      This is the set of characters use to break the input line into
       tokens for object- and file-name completion.  Those who do not use
       spaces around operators may prefer\cr
-      \code{" \\t\\n\\"\\\\'`><=+-*\%;,|&\{()\}"}%"
-      which was the default in \R 2.5.0.  (The default in pre-2.5.0
-      versions of \R was\cr
-      \code{" \\t\\n\\"\\\\'`@$><=;|&\{("}.)}%"
+      \code{" \\t\\n\\"\\\\'`><=+-*\%;,|&{()}"}%"
+      }
 #endif
 
     \item{\code{save.defaults}, \code{save.image.defaults}:}{
@@ -471,7 +486,7 @@ getOption(x, default = NULL)
   \describe{
     \item{\code{BioC_mirror}:}{The URL of a Bioconductor mirror
       for use by \code{\link{setRepositories}},
-      e.g. the default \samp{"http://www.bioconductor.org"}
+      e.g.\sspace{}the default \samp{"http://www.bioconductor.org"}
       or the European mirror
       \samp{"http://bioconductor.statistik.tu-dortmund.de"}.  Can be set
       by \code{\link{chooseBioCmirror}}.}
@@ -497,11 +512,10 @@ getOption(x, default = NULL)
     \item{\code{demo.ask}:}{default for the \code{ask} argument of
       \code{\link{demo}}.}
 
-    \item{\code{editor}:}{a non-empty string, or a function that is
-      called with a file path as argument.  Sets the default text
-      editor, e.g., for \code{\link{edit}}.  Set from the environment
-      variable \env{EDITOR} on UNIX, or if unset \env{VISUAL} or
-      \command{vi}.}
+    \item{\code{editor}:}{a non-empty string or a function that sets the
+      default text editor, e.g., for \code{\link{edit}}.  Set from the
+      environment variable \env{EDITOR} on UNIX, or if unset
+      \env{VISUAL} or \command{vi}.}
 
     \item{\code{example.ask}:}{default for the \code{ask} argument of
       \code{\link{example}}.}
@@ -548,13 +562,15 @@ getOption(x, default = NULL)
       and installed -- see \code{\link{install.packages}}.
 #ifdef windows
       Possible values are \code{"win.binary"} (the default) and
-      \code{"source"}.  Some OS X builds use \code{"mac.binary"}.
+      \code{"source"}.  Some OS X builds use \code{"mac.binary"} and
+      \code{"mac.binary.mavericks"}
 #endif
 #ifdef unix
       Possible values are \code{"source"} (the default except under the
-      CRAN OS X build) and \code{"mac.binary."}.  Windows
-      uses  \code{"win.binary"}.  (\code{"mac.binary.leopard"} and
-      \code{"mac.binary.universal"} are no longer in use.)
+      CRAN OS X build), \code{"mac.binary."} and
+      \code{"mac.binary.mavericks"}.  Windows uses  \code{"win.binary"}.
+      (\code{"mac.binary.leopard"} and \code{"mac.binary.universal"} are
+      no longer in use.)
 #endif
     }
 
@@ -567,7 +583,8 @@ getOption(x, default = NULL)
                    options(repos = r)})}.
 
       Note that you can add more repositories (Bioconductor and
-      Omegahat, notably) using \code{\link{setRepositories}()}.
+      Omegahat, R-Forge, Rforge.net \dots)
+      using \code{\link{setRepositories}}.
     }
     \item{\code{SweaveHooks}, \code{SweaveSyntax}:}{see \code{\link{Sweave}}.}
 
@@ -618,7 +635,7 @@ getOption(x, default = NULL)
   Wadsworth & Brooks/Cole.
 }
 \examples{
-op <- options(); utils::str(op) # op() may contain functions.
+op <- options(); utils::str(op) # op is a named list
 
 getOption("width") == options()$width # the latter needs more memory
 options(digits = 15)

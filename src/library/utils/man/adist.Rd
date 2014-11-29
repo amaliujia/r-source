@@ -1,6 +1,6 @@
 % File src/library/utils/man/adist.Rd
 % Part of the R package, http://www.R-project.org
-% Copyright 2011-2 R Core Team
+% Copyright 2011-2013 R Core Team
 % Distributed under GPL 2 or later
 
 \name{adist}
@@ -57,7 +57,7 @@ adist(x, y = NULL, costs = NULL, counts = FALSE, fixed = TRUE,
   are returned as the \code{"trafos"} attribute of the return value, as
   character strings with elements \samp{M}, \samp{I}, \samp{D} and
   \samp{S} indicating a match, insertion, deletion and substitution,
-  respectively.  If \code{partial = FALSE}, the offsets (positions of
+  respectively.  If \code{partial = TRUE}, the offsets (positions of
   the first and last element) of the matched substrings are returned as
   the \code{"offsets"} attribute of the return value (with both offsets
   \eqn{-1} in case of no match).

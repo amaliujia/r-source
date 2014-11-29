@@ -1,6 +1,6 @@
 % File src/library/base/man/grep.Rd
 % Part of the R package, http://www.R-project.org
-% Copyright 1995-2012 R Core Team
+% Copyright 1995-2014 R Core Team
 % Distributed under GPL 2 or later
 
 \name{grep}
@@ -110,24 +110,17 @@ regexec(pattern, text, ignore.case = FALSE,
   invalid inputs and spurious matches in multibyte locales, but for
   \code{regexpr} it changes the interpretation of the output.
   It inhibits the conversion of inputs with marked encodings, and is
-  forced if any input is found which is marked as \code{"bytes"}.
+  forced if any input is found which is marked as \code{"bytes"}
+  see \code{\link{Encoding}}).
 
   Caseless matching does not make much sense for bytes in a multibyte
   locale, and you should expect it only to work for ASCII characters if
   \code{useBytes = TRUE}.
 
-  As from \R 2.14.0, \code{regexpr} and \code{gregexpr} with \code{perl
-    = TRUE} allow Python-style named captures, but not for \emph{long
-    vector} inputs.
-}
-
-\note{
-  Prior to \R 2.11.0 there was an argument \code{extended} which could
-  be used to select \sQuote{basic} regular expressions: this was often
-  used when \code{fixed = TRUE} would be preferable.  In the actual
-  implementation (as distinct from the POSIX standard) the only
-  difference was that \samp{?}, \samp{+}, \samp{\{}, \samp{|}, \samp{(},
-  and \samp{)} were not interpreted as metacharacters.
+  \code{regexpr} and \code{gregexpr} with \code{perl = TRUE} allow
+  Python-style named captures, but not for \emph{long vector} inputs.  
+    
+  Invalid inputs in the current locale are warned about up to 5 times.
 }
 
 \value{
@@ -148,7 +141,7 @@ regexec(pattern, text, ignore.case = FALSE,
   coercion to character).  Elements of character vectors \code{x} which
   are not substituted will be returned unchanged (including any declared
   encoding).  If \code{useBytes = FALSE} a non-ASCII substituted result
-  will often be in UTF-8 with a marked encoding (e.g. if there is a
+  will often be in UTF-8 with a marked encoding (e.g., if there is a
   UTF-8 input, and in a multibyte locale unless \code{fixed = TRUE}).
   Such strings can be re-encoded by \code{\link{enc2native}}.
 
@@ -176,7 +169,7 @@ regexec(pattern, text, ignore.case = FALSE,
 
 \section{Warning}{
   POSIX 1003.2 mode of \code{gsub} and \code{gregexpr} does not
-  work correctly with repeated word-boundaries (e.g. \code{pattern =
+  work correctly with repeated word-boundaries (e.g., \code{pattern =
   "\\b"}).  Use \code{perl = TRUE} for such matches (but that may not
   work as expected with non-ASCII inputs, as the meaning of
   \sQuote{word} is system-dependent).
@@ -204,12 +197,10 @@ regexec(pattern, text, ignore.case = FALSE,
 \source{
   The C code for POSIX-style regular expression matching has changed
   over the years.  As from \R 2.10.0 the TRE library of Ville Laurikari
-  (\url{http://laurikari.net/tre/}) is used.  From 2005 to \R 2.9.2,
-  code based on \code{glibc} was used (and before that, code from GNU
-  \command{grep}).  The POSIX standard does give some room for
-  interpretation, especially in the handling of invalid regular
-  expressions and the collation of character ranges, so the results will
-  have changed slightly.
+  (\url{http://laurikari.net/tre/}) is used.  The POSIX standard does
+  give some room for interpretation, especially in the handling of
+  invalid regular expressions and the collation of character ranges, so
+  the results will have changed slightly over the years.
 
   For Perl-style matching PCRE (\url{http://www.pcre.org}) is used.
 }

@@ -25,6 +25,13 @@
 #include <Defn.h>
 
 #include "statsR.h"
+#undef _
+#ifdef ENABLE_NLS
+#include <libintl.h>
+#define _(String) dgettext ("stats", String)
+#else
+#define _(String) (String)
+#endif
 
 /* inline-able versions, used just once! */
 static R_INLINE Rboolean isUnordered_int(SEXP s)
@@ -72,6 +79,7 @@ SEXP modelframe(SEXP call, SEXP op, SEXP args, SEXP rho)
     char buf[256];
     int i, j, nr, nc;
     int nvars, ndots, nactualdots;
+    const void *vmax = vmaxget();
 
     args = CDR(args);
     terms = CAR(args); args = CDR(args);
@@ -199,7 +207,7 @@ SEXP modelframe(SEXP call, SEXP op, SEXP args, SEXP rho)
 	   explanatory variables */
 	setAttrib(data, install("terms"), terms);
 	if (isString(na_action) && length(na_action) > 0)
-	    na_action = install(translateChar(STRING_ELT(na_action, 0)));
+	    na_action = installTrChar(STRING_ELT(na_action, 0));
 	PROTECT(na_action);
 	PROTECT(tmp = lang2(na_action, data));
 	PROTECT(ans = eval(tmp, rho));
@@ -220,6 +228,7 @@ SEXP modelframe(SEXP call, SEXP op, SEXP args, SEXP rho)
        Now done at R level.
        setAttrib(ans, install("terms"), terms); */
     UNPROTECT(1);
+    vmaxset(vmax);
     return ans;
 }
 
@@ -231,12 +240,11 @@ static void firstfactor(double *x, int nrx, int ncx,
 			double *c, int nrc, int ncc, int *v)
 {
     double *cj, *xj;
-    int i, j;
 
-    for (j = 0; j < ncc; j++) {
-	xj = &x[j*nrx];
-	cj = &c[j*nrc];
-	for (i = 0; i < nrx; i++)
+    for (int j = 0; j < ncc; j++) {
+	xj = &x[j * (R_xlen_t)nrx];
+	cj = &c[j * (R_xlen_t)nrc];
+	for (int i = 0; i < nrx; i++)
 	    if(v[i] == NA_INTEGER) xj[i] = NA_REAL;
 	    else xj[i] = cj[v[i]-1];
     }
@@ -245,15 +253,14 @@ static void firstfactor(double *x, int nrx, int ncx,
 static void addfactor(double *x, int nrx, int ncx,
 		      double *c, int nrc, int ncc, int *v)
 {
-    int i, j, k;
     double *ck, *xj, *yj;
 
-    for (k = ncc - 1; k >= 0; k--) {
-	for (j = 0; j < ncx; j++) {
-	    xj = &x[j*nrx];
-	    yj = &x[(k*ncx+j)*nrx];
-	    ck = &c[k*nrc];
-	    for (i = 0; i < nrx; i++)
+    for (int k = ncc - 1; k >= 0; k--) {
+	for (int j = 0; j < ncx; j++) {
+	    xj = &x[j * (R_xlen_t)nrx];
+	    yj = &x[(k * (R_xlen_t)ncx + j)*nrx];
+	    ck = &c[k * (R_xlen_t)nrc];
+	    for (int i = 0; i < nrx; i++)
 	    if(v[i] == NA_INTEGER) yj[i] = NA_REAL;
 	    else yj[i] = ck[v[i]-1] * xj[i];
 	}
@@ -263,27 +270,25 @@ static void addfactor(double *x, int nrx, int ncx,
 static void firstvar(double *x, int nrx, int ncx, double *c, int nrc, int ncc)
 {
     double *cj, *xj;
-    int i, j;
 
-    for (j = 0; j < ncc; j++) {
-	xj = &x[j*nrx];
-	cj = &c[j*nrc];
-	for (i = 0; i < nrx; i++)
+    for (int j = 0; j < ncc; j++) {
+	xj = &x[j * (R_xlen_t)nrx];
+	cj = &c[j * (R_xlen_t)nrc];
+	for (int i = 0; i < nrx; i++)
 	    xj[i] = cj[i];
     }
 }
 
 static void addvar(double *x, int nrx, int ncx, double *c, int nrc, int ncc)
 {
-    int i, j, k;
     double *ck, *xj, *yj;
 
-    for (k = ncc - 1; k >= 0; k--) {
-	for (j = 0; j < ncx; j++) {
-	    xj = &x[j*nrx];
-	    yj = &x[(k*ncx+j)*nrx];
-	    ck = &c[k*nrc];
-	    for (i = 0; i < nrx; i++)
+    for (int k = ncc - 1; k >= 0; k--) {
+	for (int j = 0; j < ncx; j++) {
+	    xj = &x[j * (R_xlen_t)nrx];
+	    yj = &x[(k * (R_xlen_t)ncx + j)*nrx];
+	    ck = &c[k * (R_xlen_t)nrc];
+	    for (int i = 0; i < nrx; i++)
 		yj[i] = ck[i] * xj[i];
 	}
     }
@@ -309,7 +314,7 @@ static char *AppendInteger(char *buf, int i)
 static SEXP ColumnNames(SEXP x)
 {
     SEXP dn = getAttrib(x, R_DimNamesSymbol);
-    if (dn == R_NilValue)
+    if (dn == R_NilValue || length(dn) < 2)
 	return R_NilValue;
     else
 	return VECTOR_ELT(dn, 1);
@@ -327,6 +332,7 @@ SEXP modelmatrix(SEXP call, SEXP op, SEXP args, SEXP rho)
     char buf[BUFSIZE]="\0";
     char *bufp;
     const char *addp;
+    R_xlen_t nn;
 
     args = CDR(args);
 
@@ -383,7 +389,7 @@ SEXP modelmatrix(SEXP call, SEXP op, SEXP args, SEXP rho)
     if (length(vars) == 0)
 	error(_("do not know how many cases"));
 
-    n = nrows(VECTOR_ELT(vars, 0));
+    nn = n = nrows(VECTOR_ELT(vars, 0));
     /* This could be generated, so need to protect it */
     PROTECT(rnames = getAttrib(vars, R_RowNamesSymbol));
 
@@ -662,6 +668,7 @@ SEXP modelmatrix(SEXP call, SEXP op, SEXP args, SEXP rho)
     /* Allocate and compute the design matrix. */
 
     PROTECT(x = allocMatrix(REALSXP, n, nc));
+    double *rx = REAL(x);
 
 #ifdef R_MEMORY_PROFILING
     if (RTRACE(vars)){
@@ -672,11 +679,9 @@ SEXP modelmatrix(SEXP call, SEXP op, SEXP args, SEXP rho)
 
     /* a) Begin with a column of 1s for the intercept. */
 
-    if ((jnext = jstart = intrcept) != 0) {
-	for (i = 0; i < n; i++) {
-	    REAL(x)[i] = 1.0;
-	}
-    }
+    if ((jnext = jstart = intrcept) != 0)
+	for (i = 0; i < n; i++)
+	    rx[i] = 1.0;
 
     /* b) Now loop over the model terms */
 
@@ -707,13 +712,14 @@ SEXP modelmatrix(SEXP call, SEXP op, SEXP args, SEXP rho)
 		if (jnext == jstart) {
 		    if (INTEGER(nlevs)[i] > 0) {
 			int adj = isLogical(var_i)?1:0;
-			firstfactor(&REAL(x)[jstart * n], n, jnext - jstart,
+			// avoid overflow of jstart * nn PR#15578
+			firstfactor(&rx[jstart * nn], n, jnext - jstart,
 				    REAL(contrast), nrows(contrast),
 				    ncols(contrast), INTEGER(var_i)+adj);
 			jnext = jnext + ncols(contrast);
 		    }
 		    else {
-			firstvar(&REAL(x)[jstart * n], n, jnext - jstart,
+			firstvar(&rx[jstart * nn], n, jnext - jstart,
 				 REAL(var_i), n, ncols(var_i));
 			jnext = jnext + ncols(var_i);
 		    }
@@ -721,13 +727,13 @@ SEXP modelmatrix(SEXP call, SEXP op, SEXP args, SEXP rho)
 		else {
 		    if (INTEGER(nlevs)[i] > 0) {
 			int adj = isLogical(var_i)?1:0;
-			addfactor(&REAL(x)[jstart * n], n, jnext - jstart,
+			addfactor(&rx[jstart * nn], n, jnext - jstart,
 				  REAL(contrast), nrows(contrast),
 				  ncols(contrast), INTEGER(var_i)+adj);
 			jnext = jnext + (jnext - jstart)*(ncols(contrast) - 1);
 		    }
 		    else {
-			addvar(&REAL(x)[jstart * n], n, jnext - jstart,
+			addvar(&rx[jstart * nn], n, jnext - jstart,
 			       REAL(var_i), n, ncols(var_i));
 			jnext = jnext + (jnext - jstart) * (ncols(var_i) - 1);
 		    }
@@ -992,7 +998,7 @@ static int Seql2(SEXP a, SEXP b)
     if (IS_CACHED(a) && IS_CACHED(b) && ENC_KNOWN(a) == ENC_KNOWN(b))
 	return 0;
     else {
-    	void *vmax = vmaxget();
+    	const void *vmax = vmaxget();
     	int result = !strcmp(translateCharUTF8(a), translateCharUTF8(b));
     	vmaxset(vmax); /* discard any memory used by translateCharUTF8 */
     	return result;
@@ -1065,7 +1071,7 @@ static void CheckRHS(SEXP v)
     }
     if (isSymbol(v)) {
 	for (i = 0; i < length(framenames); i++) {
-	    s = install(translateChar(STRING_ELT(framenames, i)));
+	    s = installTrChar(STRING_ELT(framenames, i));
 	    if (v == s) {
 		t = allocVector(STRSXP, length(framenames) - 1);
 		for (j = 0; j < length(t); j++) {
@@ -1100,7 +1106,7 @@ static void ExtractVars(SEXP formula, int checkonly)
 	    if (formula == dotSymbol && framenames != R_NilValue) {
 		haveDot = TRUE;
 		for (i = 0; i < length(framenames); i++) {
-		    v = install(translateChar(STRING_ELT(framenames, i)));
+		    v = installTrChar(STRING_ELT(framenames, i));
 		    if (!MatchVar(v, CADR(varlist))) InstallVar(v);
 		}
 	    } else
@@ -1501,6 +1507,7 @@ static SEXP EncodeVars(SEXP formula)
 	    /* prior to 1.7.0 this made term.labels in reverse order. */
 	    SEXP r = R_NilValue, v = R_NilValue; /* -Wall */
 	    int i, j; const char *c;
+	    const void *vmax = vmaxget();
 
 	    if (!LENGTH(framenames)) return r;
 	    for (i = 0; i < LENGTH(framenames); i++) {
@@ -1516,6 +1523,7 @@ static SEXP EncodeVars(SEXP formula)
 		else {SETCDR(v, CONS(term, R_NilValue)); v = CDR(v);}
 	    }
 	    UNPROTECT(1);
+	    vmaxset(vmax);
 	    return r;
 	}
 	else {
@@ -1718,7 +1726,9 @@ SEXP termsform(SEXP args)
     a = CDR(a);
 
     nvar = length(varlist) - 1;
-    nwords = (int)((nvar - 1) / WORDSIZE + 1);
+    /* in allocating words need to allow for intercept term */
+    nwords = (int)(nvar/ WORDSIZE + 1);
+//    printf("nvar = %d, nwords = %d\n", nvar, nwords);
 
     /* Step 2: Recode the model terms in binary form */
     /* and at the same time, expand the model formula. */
@@ -1794,9 +1804,9 @@ SEXP termsform(SEXP args)
 	PROTECT(pattern = allocVector(VECSXP, nterm));
 	PROTECT(sCounts = allocVector(INTSXP, nterm));
 	counts = INTEGER(sCounts);
-	for (call = formula, n = 0; call != R_NilValue; call = CDR(call)) {
+	for (call = formula, n = 0; call != R_NilValue; call = CDR(call), n++) {
 	    SET_VECTOR_ELT(pattern, n, CAR(call));
-	    counts[n++] = BitCount(CAR(call));
+	    counts[n] = BitCount(CAR(call));
 	}
 	for (n = 0; n < nterm; n++)
 	    if(counts[n] > bitmax) bitmax = counts[n];
@@ -1887,6 +1897,7 @@ SEXP termsform(SEXP args)
     /* If there are specials stick them in here */
 
     if (specials != R_NilValue) {
+	const void *vmax = vmaxget();
 	i = length(specials);
 	PROTECT(v = allocList(i));
 	for (j = 0, t = v; j < i; j++, t = CDR(t)) {
@@ -1916,6 +1927,7 @@ SEXP termsform(SEXP args)
 	SET_TAG(a, install("specials"));
 	a = CDR(a);
 	UNPROTECT(1);
+	vmaxset(vmax);
     }
 
     UNPROTECT(2);	/* keep termlabs until here */
@@ -1926,11 +1938,11 @@ SEXP termsform(SEXP args)
     if (haveDot) {
 	if(length(framenames)) {
 	    PROTECT_INDEX ind;
-	    PROTECT_WITH_INDEX(rhs = install(translateChar(STRING_ELT(framenames, 0))),
+	    PROTECT_WITH_INDEX(rhs = installTrChar(STRING_ELT(framenames, 0)),
 			       &ind);
 	    for (i = 1; i < LENGTH(framenames); i++) {
 		REPROTECT(rhs = lang3(plusSymbol, rhs,
-				      install(translateChar(STRING_ELT(framenames, i)))),
+				      installTrChar(STRING_ELT(framenames, i))),
 			  ind);
 	    }
 	    if (!isNull(CADDR(ans)))

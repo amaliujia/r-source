@@ -31,14 +31,25 @@ example(tempfile)
 example(weekdays)
 library(help="splines")
 
+## for example(NA)
+if(require("microbenchmark")) {
+  x <- c(NaN, 1:10000)
+  print(microbenchmark(any(is.na(x)), anyNA(x)))
+} else { ## much less accurate
+  x <- c(NaN, 1e6)
+  nSim <- 2^13
+  print(rbind(is.na = system.time(replicate(nSim, any(is.na(x)))),
+              anyNA = system.time(replicate(nSim, anyNA(x)))))
+}
+
 ## utils
 example(news)
-example(packageDescription)
 example(sessionInfo)
 
 ## datasets
 example(JohnsonJohnson)
 example(ability.cov)
+example(npk)
 
 ## grDevices
 if(.Platform$OS.type == "windows") {
@@ -53,5 +64,22 @@ example(Rdutils)
 example(fileutils)
 ## results are location- and OS-specific
 example(parseLatex) # charset-specific
+
+## part of example(buildVignettes) at one time
+gVigns <- pkgVignettes("grid")
+str(gVigns) # contains paths
+
+vind <- system.file(package = "grid", "doc", "index.html")
+if(nzchar(vind)) { # so vignettes have been installed
+    `%=f=%` <- function(a, b) normalizePath(a) == normalizePath(b)
+    with(gVigns,
+         stopifnot(engines == "utils::Sweave",
+                   pkgdir %=f=% system.file(package="grid"),
+                   dir    %=f=% system.file(package = "grid", "doc"),
+                   (n. <- length(docs)) >= 12, # have 13
+                   n. == length(names), n. == length(engines),
+                   length(msg) == 0) ) # as it is a 'base' package
+    stopifnot("grid" %in% gVigns$names, inherits(gVigns, "pkgVignettes"))
+}
 
 proc.time()

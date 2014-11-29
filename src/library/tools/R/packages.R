@@ -1,7 +1,7 @@
 #  File src/library/tools/R/writePACKAGES.R
 #  Part of the R package, http://www.R-project.org
 #
-#  Copyright (C) 1995-2012 The R Core Team
+#  Copyright (C) 1995-2013 The R Core Team
 #
 #  This program is free software; you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
@@ -148,7 +148,8 @@ function(dir, fields = NULL,
                 temp <- tryCatch(read.dcf(p, fields = fields)[1L, ],
                                  error = identity)
                 if(!inherits(temp, "error")) {
-                    if(is.na(temp["NeedsCompilation"])) {
+                    if("NeedsCompilation" %in% fields &&
+                       is.na(temp["NeedsCompilation"])) {
                         l <- utils::untar(files[i], list = TRUE)
                         temp["NeedsCompilation"] <-
                             if(any(l == file.path(packages[i], "src/"))) "yes" else "no"
@@ -241,7 +242,7 @@ function(ap)
         wh <- which(dp == pkgs)
         vers <- package_version(ap[wh, "Version"])
         keep_ver <- max(vers)
-        keep_idx = which(vers == keep_ver)[1L] # they might all be max
+	keep_idx <- which.max(vers == keep_ver) # they might all be max
         wh <- wh[-keep_idx]
         end_i <- i + length(wh) - 1L
         stale_dups[i:end_i] <- wh

@@ -1,7 +1,9 @@
 % File src/library/utils/man/setRepositories.Rd
 % Part of the R package, http://www.R-project.org
-% Copyright 1995-2010 R Core Team
+% Copyright 1995-2014 R Core Team
 % Distributed under GPL 2 or later
+
+\newcommand{\sspace}{\ifelse{latex}{\out{~}}{ }}
 
 \name{setRepositories}
 \alias{setRepositories}
@@ -31,7 +33,8 @@ setRepositories(graphics = getOption("menu.graphics"),
   in \file{\var{HOME}/.R/repositories} which will take precedence.
 
   A Bioconductor mirror can be selected by setting
-  \code{\link{options}("BioC_mirror")}: the default value is
+  \code{\link{options}("BioC_mirror")}, e.g.\sspace{}via
+  \code{\link{chooseBioCmirror}} the default value is
   \samp{"http://www.bioconductor.org"}.
 
   The items that are preselected are those that are currently in
@@ -40,7 +43,7 @@ setRepositories(graphics = getOption("menu.graphics"),
 
   The list of repositories offered depends on the setting of option
   \code{"pkgType"} as some repositories only offer a subset of types
-  (e.g. only source packages or not OS X binary packages).
+  (e.g., only source packages or not OS X binary packages).
   Further, for binary packages some repositories (notably R-Forge) only
   offer packages for the current or recent versions of \R.
 
@@ -63,7 +66,8 @@ setRepositories(graphics = getOption("menu.graphics"),
   \code{repos}) or \code{\link{NULL}} if no changes were applied.
 }
 \seealso{
-  \code{\link{chooseCRANmirror}}, \code{\link{install.packages}}.
+  \code{\link{chooseCRANmirror}}, \code{\link{chooseBioCmirror}},
+  \code{\link{install.packages}}.
 }
 \examples{\dontrun{
 setRepositories(addURLs =

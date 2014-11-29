@@ -1,6 +1,6 @@
 % File src/library/grDevices/man/Type1Font.Rd
 % Part of the R package, http://www.R-project.org
-% Copyright 1995-2011 R Core Team
+% Copyright 1995-2013 R Core Team
 % Distributed under GPL 2 or later
 
 \name{Type1Font}
@@ -49,9 +49,9 @@ CIDFont(family, cmap, cmapEncoding, pdfresource = "")
   However, the glyphs in the first four fonts are referenced by name
   and any encoding given within the \file{.afm} files is not used.
 
-  As from \R 2.14.0 the \file{.afm} files may be compressed with (or
-  without) final extension \file{.gz}: the files which ship with \R are
-  installed as compressed files with this extension.
+  The \file{.afm} files may be compressed with (or without) final
+  extension \file{.gz}: the files which ship with \R are installed as
+  compressed files with this extension.
 
   Glyphs in CID-keyed fonts are accessed by ID (number) and not by name.
   The CMap file maps encoded strings (usually in a MBCS) to IDs, so

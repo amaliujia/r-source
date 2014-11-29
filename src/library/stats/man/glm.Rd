@@ -1,16 +1,17 @@
 % File src/library/stats/man/glm.Rd
 % Part of the R package, http://www.R-project.org
-% Copyright 1995-2010 R Core Team
+% Copyright 1995-2013 R Core Team
 % Distributed under GPL 2 or later
 
 \newcommand{\CRANpkg}{\href{http://CRAN.R-project.org/package=#1}{\pkg{#1}}}
+\newcommand{\sspace}{\ifelse{latex}{\out{~}}{ }}
 
 \name{glm}
 \title{Fitting Generalized Linear Models}
 \alias{glm}
 \alias{glm.fit}
 \alias{weights.glm}
-\alias{print.glm}
+%\alias{print.glm}
 \concept{regression}
 \concept{logistic}
 \concept{log-linear}
@@ -171,7 +172,7 @@ glm.fit(x, y, weights = rep(1, nobs),
 
   For the background to warning messages about \sQuote{fitted probabilities
     numerically 0 or 1 occurred} for binomial GLMs, see Venables &
-  Ripley (2002, pp. 197--8).
+  Ripley (2002, pp.\sspace{}197--8).
 }
 
 \section{Fitting functions}{
@@ -338,12 +339,13 @@ glm.D93 <- glm(counts ~ outcome + treatment, family = poisson())
 anova(glm.D93)
 \donttest{summary(glm.D93)}
 
-## an example with offsets from Venables & Ripley (2002, p.189)
+\donttest{## an example with offsets from Venables & Ripley (2002, p.189)
 utils::data(anorexia, package = "MASS")
 
 anorex.1 <- glm(Postwt ~ Prewt + Treat + offset(Prewt),
                 family = gaussian, data = anorexia)
 summary(anorex.1)
+}
 
 # A Gamma example, from McCullagh & Nelder (1989, pp. 300-2)
 clotting <- data.frame(

@@ -1,7 +1,7 @@
 /*
  *  R : A Computer Langage for Statistical Data Analysis
  *  Copyright (C) 1995, 1996  Robert Gentleman and Ross Ihaka
- *  Copyright (C) 1998--2012  The R Core Team
+ *  Copyright (C) 1998--2013  The R Core Team
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -376,7 +376,7 @@ SEXP in_RX11_dataentry(SEXP call, SEXP op, SEXP args, SEXP rho)
 
     /* start up the window, more initializing in here */
     if (initwin(DE, title))
-	errorcall(call, "invalid device");
+	errorcall(call, "unable to start data editor");
 
     /* set up a context which will close the window if there is an error */
     begincontext(&cntxt, CTXT_CCODE, R_NilValue, R_BaseEnv, R_BaseEnv,
@@ -511,7 +511,7 @@ SEXP in_R_X11_dataviewer(SEXP call, SEXP op, SEXP args, SEXP rho)
 
     /* start up the window, more initializing in here */
     if (initwin(DE, CHAR(STRING_ELT(stitle, 0))))
-	errorcall(call, "invalid device");
+	errorcall(call, "unable to start data viewer");
 
     /* set up a context which will close the window if there is an error */
     begincontext(&cntxt, CTXT_CCODE, R_NilValue, R_BaseEnv, R_BaseEnv,
@@ -1943,7 +1943,7 @@ static Rboolean initwin(DEstruct DE, const char *title) /* TRUE = Error */
     } else {
 	DE->font_info = XLoadQueryFont(iodisplay, font_name);
 	if (DE->font_info == NULL) {
-	    warning("unable to losd font %s", font_name);
+	    warning("unable to load font %s", font_name);
 	    return TRUE; /* ERROR */
 	}
     }

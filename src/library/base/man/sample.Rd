@@ -1,6 +1,6 @@
 % File src/library/base/man/sample.Rd
 % Part of the R package, http://www.R-project.org
-% Copyright 1995-2012 R Core Team
+% Copyright 1995-2013 R Core Team
 % Distributed under GPL 2 or later
 
 \newcommand{\CRANpkg}{\href{http://CRAN.R-project.org/package=#1}{\pkg{#1}}}
@@ -43,9 +43,9 @@ sample.int(n, size = n, replace = FALSE, prob = NULL)
   inferred from the first argument, so that \code{sample(x)} generates a
   random permutation of the elements of \code{x} (or \code{1:x}).
 
-  As from \R 2.11.0 it is allowed to ask for \code{size = 0} samples
-  with \code{n = 0} or a length-zero \code{x}, but otherwise \code{n >
-  0} or positive \code{length(x)} is required.
+  It is allowed to ask for \code{size = 0} samples with \code{n = 0} or
+  a length-zero \code{x}, but otherwise \code{n > 0} or positive
+  \code{length(x)} is required.
 
   Non-integer positive numerical values of \code{n} or \code{x} will be
   truncated to the next smallest integer, which has to be no larger than
@@ -55,9 +55,8 @@ sample.int(n, size = n, replace = FALSE, prob = NULL)
   weights for obtaining the elements of the vector being sampled.  They
   need not sum to one, but they should be non-negative and not all zero.
   If \code{replace} is true, Walker's alias method (Ripley, 1987) is
-  used when there are more than 250 reasonably probable values: this
-  gives results incompatible with those from \R < 2.2.0, and there will
-  be a warning the first time this happens in a session.
+  used when there are more than 200 reasonably probable values: this
+  gives results incompatible with those from \R < 2.2.0.
 
   If \code{replace} is false, these probabilities are applied
   sequentially, that is the probability of choosing the next item is

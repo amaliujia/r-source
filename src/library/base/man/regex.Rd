@@ -1,7 +1,9 @@
 % File src/library/base/man/regex.Rd
 % Part of the R package, http://www.R-project.org
-% Copyright 1995-2011 R Core Team
+% Copyright 1995-2013 R Core Team
 % Distributed under GPL 2 or later
+
+\newcommand{\sspace}{\ifelse{latex}{\out{~}}{ }}
 
 \name{regex}
 \alias{regex}
@@ -30,7 +32,7 @@
 
   Patterns are described here as they would be printed by \code{cat}:
   (\emph{do remember that backslashes need to be doubled when entering \R
-    character strings}, e.g. from the keyboard).
+    character strings}, e.g.\sspace{}from the keyboard).
 
   Do not assume that long regular expressions will be accepted: the
   POSIX standard only requires up to 256 \emph{bytes}.
@@ -40,7 +42,7 @@
   mode of \code{grep}, \code{regexpr}, \code{gregexpr}, \code{sub},
   \code{gsub} and \code{strsplit}.  They use an implementation of the
   POSIX 1003.2 standard: that allows some scope for interpretation and
-  the interpretations here are those used as from \R 2.10.0.
+  the interpretations here are those currently used by \R.
 
   Regular expressions are constructed analogously to arithmetic
   expressions, by using various operators to combine smaller
@@ -74,8 +76,7 @@
   best avoided.)  The only portable way to specify all ASCII letters is
   to list them all as the character class\cr
   \samp{[ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz]}.\cr
-  (The current implementation uses numerical order of the encoding: prior to
-  \R 2.10.0 locale-specific collation was used, and might be again.)
+  (The current implementation uses numerical order of the encoding.)
 
   Certain named classes of characters are predefined.  Their
   interpretation depends on the \emph{locale} (see \link{locales}); the
@@ -220,10 +221,10 @@
   more than 9 backreferences (but the replacement in \code{\link{sub}}
   can only refer to the first 9).
 
-  Character ranges are interpreted in the numerical order of
-  the characters, either as bytes in a single-byte locale or as Unicode
-  points in UTF-8 mode.  So in either case \samp{[A-Za-z]} specifies
-  the set of ASCII letters.
+  Character ranges are interpreted in the numerical order of the
+  characters, either as bytes in a single-byte locale or as Unicode code
+  points in UTF-8 mode.  So in either case \samp{[A-Za-z]} specifies the
+  set of ASCII letters.
 
   In UTF-8 mode the named character classes only match ASCII characters:
   see \samp{\\p} below for an alternative.
@@ -257,18 +258,18 @@
   any decimal digit, space character and \sQuote{word} character
   (letter, digit or underscore in the current locale: in UTF-8 mode only
   ASCII letters and digits are considered) respectively, and their
-  upper-case versions represent their negation.  Unlike POSIX, vertical
-  tab is not regarded as a space character.  Sequences \samp{\\h},
-  \samp{\\v}, \samp{\\H} and \samp{\\V} match horizontal and vertical
-  space or the negation.  (In UTF-8 mode, these do match non-ASCII
-  Unicode points.)
+  upper-case versions represent their negation.  Vertical tab is not
+  regarded as a space character before PCRE 8.34 (included in \R 3.0.3).
+  Sequences \samp{\\h}, \samp{\\v}, \samp{\\H} and \samp{\\V} match
+  horizontal and vertical space or the negation.  (In UTF-8 mode, these
+  do match non-ASCII Unicode code points.)
 
   There are additional escape sequences: \samp{\\cx} is
   \samp{cntrl-x} for any \samp{x}, \samp{\\ddd} is the
   octal character (for up to three digits unless
   interpretable as a backreference, as \samp{\\1} to \samp{\\7} always
   are), and \samp{\\xhh} specifies a character by two hex digits.
-  In a UTF-8 locale, \samp{\\x\{h...\}} specifies a Unicode point
+  In a UTF-8 locale, \samp{\\x\{h...\}} specifies a Unicode code point
   by one or more hex digits.  (Note that some of these will be
   interpreted by \R's parser in literal character strings.)
 
@@ -310,11 +311,10 @@
   equivalents: they do not allow repetition quantifiers nor \samp{\\C}
   in \code{\dots}.
 
-  As from \R 2.14.0 \code{regexpr} and \code{gregexpr} support
-  \sQuote{named capture}.  If groups are named, e.g.,
-  \code{"(?<first>[A-Z][a-z]+)"} then the positions of the matches are
-  also returned by name.  (Named backreferences are not supported by
-  \code{sub}.)
+  \code{regexpr} and \code{gregexpr} support \sQuote{named capture}.  If
+  groups are named, e.g., \code{"(?<first>[A-Z][a-z]+)"} then the
+  positions of the matches are also returned by name.  (Named
+  backreferences are not supported by \code{sub}.)
 
   Atomic grouping, possessive qualifiers and conditional
   and recursive patterns are not covered here.

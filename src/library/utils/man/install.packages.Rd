@@ -1,7 +1,9 @@
 % File src/library/utils/man/install.packages.Rd
 % Part of the R package, http://www.R-project.org
-% Copyright 1995-2012 R Core Team
+% Copyright 1995-2014 R Core Team
 % Distributed under GPL 2 or later
+
+\newcommand{\sspace}{\ifelse{latex}{\out{~}}{ }}
 
 \name{install.packages}
 \alias{install.packages}
@@ -26,19 +28,23 @@ install.packages(pkgs, lib, repos = getOption("repos"),
   \item{pkgs}{character vector of the names of packages whose
     current versions should be downloaded from the repositories.
 
-    If \code{repos = NULL}, a character vector of file paths of
+    If \code{repos = NULL}, a character vector of
 #ifdef windows
-    \file{.zip} files containing binary builds of packages. Source
-    directories or \file{.tar.gz} archives may also be installed, but
-    some packages need suitable tools installed (see the
-    \sQuote{Details} section).
+    file paths of \file{.zip} files containing binary builds of
+    packages.  (\code{http://} and \code{file://} URLs are also accepted
+    and the files will be downloaded and installed from local copies.)
+    Source directories or file paths or URLs of archives be
+    specified with \code{type = "source"}, but some packages need
+    suitable tools installed (see the \sQuote{Details} section).
 #endif
 #ifdef unix
-    \file{.tar.gz} files.  These can be source archives or binary
-    package archive files (as created by \command{R CMD build --binary}).
-    On a CRAN build of \R for OS X these can be \file{.tgz} files
-    containing binary package archives.
-    Tilde-expansion will be done on the file paths.
+    file paths.  These can be source directories or archives
+    or binary package archive files (as created by \command{R CMD build
+      --binary}).  (\code{http://} and \code{file://} URLs are also
+    accepted and the files will be downloaded and installed from local
+    copies.)  On a CRAN build of \R for OS X these can be \file{.tgz}
+    files containing binary package archives.
+    Tilde-expansion will be done on file paths.
 #endif
 
     If this is missing or a zero-length character vector, a listbox of
@@ -53,17 +59,18 @@ install.packages(pkgs, lib, repos = getOption("repos"),
   \item{repos}{
     character vector, the base URL(s) of the repositories
     to use, e.g., the URL of a CRAN mirror such as
-    \code{"http://cran.us.r-project.org"}.
+    \code{"http://cran.us.r-project.org"}.  For more details on
+    supported URL schemes see \code{\link{url}}.
 
-    Can be \code{NULL} to install from local files
-    (with extension \file{.tar.gz} for source packages).
+    Can be \code{NULL} to install from local files, directories or URLs:
+    this will be inferred by extension from \code{pkgs} if of length one.
   }
   \item{contriburl}{
     URL(s) of the contrib sections of the repositories.  Use this
     argument if your repository mirror is incomplete, e.g., because
     you burned only the \file{contrib} section on a CD, or only have
-    binary packages.  Overrides argument \code{repos}.  As with
-    \code{repos}, can also be \code{NULL} to install from local files.
+    binary packages.  Overrides argument \code{repos}.  Can also be
+    \code{NULL} to install from local files.
   }
   \item{method}{
     download method, see \code{\link{download.file}}.
@@ -93,33 +100,36 @@ install.packages(pkgs, lib, repos = getOption("repos"),
     The default, \code{NA}, means
     \code{c("Depends", "Imports", "LinkingTo")}.
 
-    \code{TRUE} means (as from \R 2.15.0) to use
+    \code{TRUE} means to use
     \code{c("Depends", "Imports", "LinkingTo", "Suggests")} for
     \code{pkgs} and
     \code{c("Depends", "Imports", "LinkingTo")} for added dependencies:
     this installs all the packages needed to run \code{pkgs}, their
     examples, tests and vignettes (if the package author specified them
     correctly).
+
+    In all of these, \code{"LinkingTo"} is omitted for binary packages.
   }
   \item{type}{character, indicating the type of package to download and
     install.
 
-    Possible values are \code{"source"}, \code{"mac.binary.leopard"} and
+    Possible values are (currently) \code{"source"},
+    \code{"mac.binary"}, \code{"mac.binary.mavericks"} and
     \code{"win.binary"}: the binary types can be listed and downloaded
     but not installed on other platforms.
 
     The default is the appropriate binary type on Windows and on the
-    CRAN binary OS X distribution, otherwise \code{"source"}.  For
-    the platforms where binary packages are the default, an alternative
-    is \code{"both"} which means \sQuote{try binary if available,
-    otherwise try source}.  (This will only choose the binary package if
-    its version number is no older than the source version.  In
-    interactive use it will ask before attempting to install source
+    CRAN binary OS X distributions, otherwise \code{"source"}.  For the
+    platforms where binary packages are the default, an alternative is
+    \code{"both"} which means \sQuote{try binary if available and
+    current, otherwise try source}.  (This will only choose the binary
+    package if its version number is no older than the source version.
+    In interactive use it will ask before attempting to install source
     packages.)
   }
   \item{configure.args}{
-    (not used on Windows) a character vector or a named list.  If a
-    character vector with no names is supplied, the elements are
+    (Used only for source installs.) A character vector or a named list.
+    If a character vector with no names is supplied, the elements are
     concatenated into a single string (separated by a space) and used as
     the value for the \option{--configure-args} flag in the call to
     \command{R CMD INSTALL}.  If the character vector has names these
@@ -135,9 +145,9 @@ install.packages(pkgs, lib, repos = getOption("repos"),
     value for \option{--configure-args}.
   }
   \item{configure.vars}{
-    (not used on Windows) analogous to \code{configure.args} for flag
-    \option{--configure-vars}, which is used to set environment variables
-    for the \command{configure} run.
+    (Used only for source installs.) Analogous to \code{configure.args}
+    for flag \option{--configure-vars}, which is used to set environment
+    variables for the \command{configure} run.
   }
   \item{clean}{a logical value indicating whether to specify
     to add the \option{--clean} flag to the call to
@@ -157,8 +167,8 @@ install.packages(pkgs, lib, repos = getOption("repos"),
     a logical value: should the \option{--libs-only} option be used to
     install only additional sub-architectures?  (See also
     \code{INSTALL_opts}.)  This can also be used on Windows to install
-    just the DLL(s) from a binary package, e.g. to add 64-bit DLLs to a
-    32-bit install.
+    just the DLL(s) from a binary package, e.g.\sspace{}to add 64-bit
+    DLLs to a 32-bit install.
   }
   \item{INSTALL_opts}{
     an optional character vector of additional option(s) to be passed to
@@ -185,20 +195,20 @@ install.packages(pkgs, lib, repos = getOption("repos"),
 \details{
   \R packages are primarily distributed as \emph{source} packages, but
   \emph{binary} packages (a packaging up of the installed package) are
-  also supported, and the type most commonly used on Windows and from
-  the CRAN distribution for OS X.  This function can install either
+  also supported, and the type most commonly used on Windows and by
+  the CRAN distributions for OS X.  This function can install either
   type where supported, either by downloading a file from a repository
   or from a local file.  The default type is given by
   \code{\link{getOption}("pkgType")}: this defaults to \code{"source"}
   apart from under Windows or a CRAN binary distribution for OS X.
 
-  This is the main function to install packages.  It takes
-  a vector of names and a destination library, downloads the packages
-  from the repositories and installs them.  (If the library is omitted
-  it defaults to the first directory in \code{.libPaths()}, with a
-  message if there is more than one.)  If \code{lib} is omitted or is of
-  length one and is not a (group) writable directory, the code offers
-  to create a personal library tree (the first element of
+  This is the main function to install packages.  It takes a vector of
+  names and a destination library, downloads the packages from the
+  repositories and installs them.  (If the library is omitted it
+  defaults to the first directory in \code{.libPaths()}, with a message
+  if there is more than one.)  If \code{lib} is omitted or is of length
+  one and is not a (group) writable directory, in interactive use the
+  code offers to create a personal library tree (the first element of
   \code{Sys.getenv("R_LIBS_USER")}) and install there.
 #ifdef windows
   Detection of a writable directory is problematic on Windows: see the
@@ -220,7 +230,7 @@ install.packages(pkgs, lib, repos = getOption("repos"),
 
   When installing a binary package, \code{install.packages} will abort
   the install if it detects that the package is already installed and is
-  currently in use.  In some circumstances (e.g. multiple instances of
+  currently in use.  In some circumstances (e.g., multiple instances of
   \R running at the same time and sharing a library) it will not detect a
   problem, but the installation may fail.
 #endif
@@ -297,12 +307,13 @@ install.packages(pkgs, lib, repos = getOption("repos"),
 #ifdef unix
 \note{
   Some binary distributions of \R have \code{INSTALL} in a separate
-  bundle, e.g. an \code{R-devel} RPM.  \code{install.packages} will
+  bundle, e.g.\sspace{}an \code{R-devel} RPM.  \code{install.packages} will
   give an error if called with \code{type = "source"} on such a system.
 
-  Some binary distributions of \R can be installed on a machine without the
-  tools needed to install packages: the remedy is to do a complete
-  install of \R which should bring in all those tools as dependencies.
+  Some binary Linux distributions of \R can be installed on a machine
+  without the tools needed to install packages: a possible remedy is to
+  do a complete install of \R which should bring in all those tools as
+  dependencies.
 }
 #endif
 #ifdef windows

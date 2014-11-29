@@ -1,6 +1,6 @@
 % File src/library/base/man/scan.Rd
 % Part of the R package, http://www.R-project.org
-% Copyright 1995-2011 R Core Team
+% Copyright 1995-2014 R Core Team
 % Distributed under GPL 2 or later
 
 \name{scan}
@@ -16,7 +16,7 @@ scan(file = "", what = double(), nmax = -1, n = -1, sep = "",
      flush = FALSE, fill = FALSE, strip.white = FALSE,
      quiet = FALSE, blank.lines.skip = TRUE, multi.line = TRUE,
      comment.char = "", allowEscapes = FALSE,
-     fileEncoding = "", encoding = "unknown", text)
+     fileEncoding = "", encoding = "unknown", text, skipNul = FALSE)
 }
 \arguments{
   \item{file}{the name of a file to read data values from.  If the
@@ -33,7 +33,7 @@ scan(file = "", what = double(), nmax = -1, n = -1, sep = "",
     When running \R from a script, \code{file = "stdin"} can be used to
     refer to the process's \code{stdin} file stream.
 
-    As from \R 2.10.0 this can be a compressed file (see \code{\link{file}}).
+    This can be a compressed file (see \code{\link{file}}).
 
     Alternatively, \code{file} can be a \code{\link{connection}},
     which will be opened if necessary, and if so closed at the end of
@@ -159,13 +159,16 @@ scan(file = "", what = double(), nmax = -1, n = -1, sep = "",
   \item{encoding}{encoding to be assumed for input strings.  If the
     value is \code{"latin1"} or \code{"UTF-8"} it is used to mark
     character strings as known to be in Latin-1 or UTF-8: it is not used
-    to re-encode the input (see \code{fileEncoding}.  See also \sQuote{Details}.
+    to re-encode the input (see \code{fileEncoding}).
+    See also \sQuote{Details}.
   }
 
   \item{text}{character string: if \code{file} is not supplied and this is,
     then data are read from the value of \code{text} via a text connection.
   }
 
+  \item{skipNul}{logical: should nuls be skipped when reading character
+    fields?}
 }
 \details{
   The value of \code{what} can be a list of types, in which case
@@ -179,7 +182,7 @@ scan(file = "", what = double(), nmax = -1, n = -1, sep = "",
 
   \sQuote{White space} is defined for the purposes of this function as
   one or more contiguous characters from the set space, horizontal tab,
-  carriage return and line feed.  It does not include form feed or
+  carriage return and line feed.  It does not include form feed nor
   vertical tab, but in Latin-1 and Windows 8-bit locales 'space'
   includes non-breaking space.
 
@@ -232,10 +235,14 @@ scan(file = "", what = double(), nmax = -1, n = -1, sep = "",
   is a list, otherwise every 10000 items.
 
   If \code{file} is a character string and \code{fileEncoding} is
-  non-default, or it it is a not-already-open \link{connection} with a
+  non-default, or if it is a not-already-open \link{connection} with a
   non-default \code{encoding} argument, the text is converted to UTF-8
   and declared as such (and the \code{encoding} argument to \code{scan}
   is ignored).  See the examples of \code{\link{readLines}}.
+
+  Embedded nuls in the input stream will terminate the field currently
+  being read, with a warning once per call to \code{scan}.  Setting
+  \code{skipNul = TRUE} causes them to be ignored.
 }
 \value{
   if \code{what} is a list, a list of the same length and same names (as

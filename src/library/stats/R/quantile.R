@@ -1,7 +1,7 @@
 #  File src/library/stats/R/quantile.R
 #  Part of the R package, http://www.R-project.org
 #
-#  Copyright (C) 1995-2012 The R Core Team
+#  Copyright (C) 1995-2013 The R Core Team
 #
 #  This program is free software; you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
@@ -32,7 +32,7 @@ quantile.default <-
     } else lx <- NULL
     if (na.rm)
 	x <- x[!is.na(x)]
-    else if (any(is.na(x)))
+    else if (anyNA(x))
 	stop("missing values and NaN's not allowed if 'na.rm' is FALSE")
     eps <- 100*.Machine$double.eps
     if (any((p.ok <- !is.na(probs)) & (probs < -eps | probs > 1+eps)))

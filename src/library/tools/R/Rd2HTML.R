@@ -1,7 +1,7 @@
 
 #  File src/library/tools/R/Rd2HTML.R
 #
-#  Copyright (C) 1995-2012 The R Core Team
+#  Copyright (C) 1995-2013 The R Core Team
 #  Part of the R package, http://www.R-project.org
 #
 #  This program is free software; you can redistribute it and/or modify
@@ -53,8 +53,7 @@ get_link <- function(arg, tag, Rdfile) {
     list(topic = topic, dest = dest, pkg = pkg, targetfile = targetfile)
 }
 
-
-# translation of Utils.pm function of the same name, plus "unknown"
+## translation of Utils.pm function of the same name, plus "unknown"
 mime_canonical_encoding <- function(encoding)
 {
     encoding[encoding %in% c("", "unknown")] <-
@@ -110,18 +109,36 @@ vhtmlify <- function(x, inEqn = FALSE) { # code version
     x
 }
 
-# URL encode anything other than alphanumeric, . and _
-
-urlify <- function(x) { # make a string legal in a URL
+## URL encode anything other than alphanumeric, . - _ $ and reserved
+## characters in URLs.
+urlify <- function(x) {
+    ## Like utils::URLencode(reserved = FALSE), but with '&' replaced by
+    ## '&amp;' and hence directly usable for href attributes.
+    ## See
+    ##   <http://www.w3.org/TR/html4/appendix/notes.html#h-B.2.1>
+    ##   <http://www.w3.org/TR/html4/appendix/notes.html#h-B.2.2>
+    ##   RFC 3986 <http://tools.ietf.org/html/rfc3986>
     chars <- unlist(strsplit(x, ""))
-    hex <- paste0("%", as.character(charToRaw(x)))
-    mixed <- ifelse(grepl("[0-9a-zA-Z._]", chars), chars, hex)
-    paste(mixed, collapse="")
+    hex <- vapply(chars,
+                  function(x)
+                  paste0("%", as.character(charToRaw(x)),
+                         collapse = ""),
+                  "")
+    todo <- paste0("[^",
+                   "][!$&'()*+,;=:/?@#",
+                   "ABCDEFGHIJKLMNOPQRSTUVWXYZ",
+                   "abcdefghijklmnopqrstuvwxyz0123456789._~-",
+                   "]")
+    mixed <- ifelse(grepl(todo, chars), hex, chars)
+    gsub("&", "&amp;", paste(mixed, collapse = ""), fixed = TRUE)
 }
+## (Equivalently, could use escapeAmpersand(utils::URLencode(x)).)
 
-# Ampersands should be escaped in proper HTML URIs
+## Ampersands should be escaped in proper HTML URIs
+escapeAmpersand <- function(x) gsub("&", "&amp;", x, fixed = TRUE)
 
-escapeAmpersand <- function(x) gsub("&", "&amp;", x, fixed=TRUE)
+invalid_HTML_chars_re <-
+    "[\u0001-\u0008\u000b\u000c\u000e-\u001f\u007f-\u009f]"
 
 ## This gets used two ways:
 
@@ -404,7 +421,7 @@ Rd2HTML <-
     }
 
     writeBlock <- function(block, tag, blocktag) {
-        doParas <- !(blocktag %in% c("\\command", "\\tabular"))
+        doParas <- !(blocktag %in% c("\\tabular"))
 	switch(tag,
                UNKNOWN =,
                VERB = of1(vhtmlify(block, inEqn)),
@@ -725,7 +742,7 @@ Rd2HTML <-
     	} else
     	    of1(sectionTitles[tag])
         of1(paste0("</h", sectionLevel+2L, ">\n\n"))
-        if (tag %in% c("\\examples", "\\synopsis", "\\usage")) {
+        if (tag %in% c("\\examples", "\\usage")) {
             of1("<pre>")
             inPara <<- NA
             pre <- TRUE
@@ -869,3 +886,4 @@ function(dir)
     unlist(lapply(rev(dir(dir, full.names = TRUE)),
                   .find_HTML_links_in_package))
 }
+

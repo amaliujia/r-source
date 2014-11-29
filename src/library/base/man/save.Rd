@@ -1,6 +1,6 @@
 % File src/library/base/man/save.Rd
 % Part of the R package, http://www.R-project.org
-% Copyright 1995-2013 R Core Team
+% Copyright 1995-2014 R Core Team
 % Distributed under GPL 2 or later
 
 \name{save}
@@ -10,7 +10,8 @@
 \description{
   \code{save} writes an external representation of \R objects to the
   specified file.  The objects can be read back from the file at a later
-  date by using the function \code{load} (or \code{data} in some cases).
+  date by using the function \code{\link{load}} or \code{\link{attach}}
+  (or \code{\link{data}} in some cases).
 
   \code{save.image()} is just a short-cut for \sQuote{save my current
     workspace}, i.e., \code{save(list = ls(all = TRUE), file =
@@ -48,7 +49,7 @@ save.image(file = ".RData", version = NULL, ascii = FALSE,
     \command{gzip} compression, and character strings \code{"gzip"},
     \code{"bzip2"} or \code{"xz"} specify the type of
     compression.  Ignored when \code{file} is a connection and
-    for workspace format version 1.} 
+    for workspace format version 1.}
   \item{compression_level}{integer: the level of compression to be
     used.  Defaults to \code{6} for \command{gzip} compression and to
     \code{9} for \command{bzip2} or \command{xz} compression.}
@@ -73,11 +74,15 @@ save.image(file = ".RData", version = NULL, ascii = FALSE,
 
   All \R platforms use the XDR (bigendian) representation of C ints and
   doubles in binary save-d files, and these are portable across all \R
-  platforms.  (ASCII saves used to be useful for moving data between
-  platforms but are now mainly of historical interest.  They can be more
-  compact than binary saves where compression is not used, but are
-  almost always slower to both read and write: binary saves compress
-  much better than ASCII ones.)
+  platforms.
+
+  ASCII saves used to be useful for moving data between platforms but
+  are now mainly of historical interest.  They can be more compact than
+  binary saves where compression is not used, but are almost always
+  slower to both read and write: binary saves compress much better than
+  ASCII ones.  Further, ASCII saves may not restore double/complex
+  values exactly, and what value is restored may depend on the \R
+  platform.
 
   Default values for the \code{ascii}, \code{compress}, \code{safe} and
   \code{version} arguments can be modified with the
@@ -85,14 +90,18 @@ save.image(file = ".RData", version = NULL, ascii = FALSE,
   \code{save.image}), see also the \sQuote{Examples} section.  If a
   \code{"save.image.defaults"} option is set it is used in preference to
   \code{"save.defaults"} for function \code{save.image} (which allows
-  this to have different defaults).
+  this to have different defaults).  In addition,
+  \code{compression_level} can be part of the \code{"save.defaults"}
+  option.
 
-  A connection that is not already open will be opened in mode \code{"wb"}.
+  A connection that is not already open will be opened in mode
+  \code{"wb"}.  Supplying a connection which is open and not in binary
+  mode gives an error.
 }
 
 \section{Compression}{
   Large files can be reduced considerably in size by compression.  A
-  particular 46MB object was saved as 35MB without compression in 2
+  particular 46MB \R object was saved as 35MB without compression in 2
   seconds, 22MB with \command{gzip} compression in 8 secs, 19MB with
   \command{bzip2} compression in 13 secs and 9.4MB with \command{xz}
   compression in 40 secs.  The load times were 1.3, 2.8, 5.5 and 5.7
@@ -132,14 +141,17 @@ save.image(file = ".RData", version = NULL, ascii = FALSE,
 
   Saved \R objects are binary files, even those saved with
   \code{ascii = TRUE}, so ensure that they are transferred without
-  conversion of end of line markers and of 8-bit characters.  The lines
+  conversion of end-of-line markers and of 8-bit characters.  The lines
   are delimited by LF on all platforms.
 
   Although the default version has not changed since \R 1.4.0, this
   does not mean that saved files are necessarily backwards compatible.
   You will be able to load a saved image into an earlier version of \R
-  unless use is made of later additions (for example, raw vectors or
-  external pointers).
+  unless use is made of later additions (for example, raw vectors,
+  external pointers and some S4 objects).
+
+  One such \sQuote{later addition} was long vectors, introduced in \R
+  3.0.0 and loadable only on 64-bit platforms.
 }
 \seealso{
   \code{\link{dput}}, \code{\link{dump}}, \code{\link{load}},

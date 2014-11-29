@@ -1,7 +1,7 @@
 /*
  *  R : A Computer Language for Statistical Data Analysis
  *  Copyright (C) 1995, 1996  Robert Gentleman and Ross Ihaka
- *  Copyright (C) 1998--2011  The R Core Team
+ *  Copyright (C) 1998--2013  The R Core Team
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -52,6 +52,10 @@ extern int errno;
 #endif
 
 #include "zlib.h"
+
+#ifndef max
+#define max(a,b) ((a > b) ? a : b)
+#endif
 
 /* from connections.o */
 extern gzFile R_gzopen (const char *path, const char *mode);
@@ -2229,8 +2233,6 @@ PostScriptDesc;
 
 /*  Part 3.  Graphics Support Code.  */
 
-static const char * const TypeFaceDef[] = { "R", "B", "I", "BI", "S" };
-
 static void specialCaseCM(FILE *fp, type1fontfamily family, int familynum)
 {
 	fprintf(fp, "%% begin encoding\n");
@@ -3389,7 +3391,9 @@ PSDeviceDriver(pDevDesc dd, const char *file, const char *paper,
     dd->left = 72 * xoff;			/* left */
     dd->right = 72 * (xoff + pd->width);	/* right */
     dd->bottom = 72 * yoff;			/* bottom */
-    dd->top = 72 * (yoff + pd->height);	/* top */
+    dd->top = 72 * (yoff + pd->height);	        /* top */
+    dd->clipLeft = dd->left; dd->clipRight = dd->right;
+    dd->clipBottom = dd->bottom; dd->clipTop = dd->top;
 
     dd->cra[0] = 0.9 * pointsize;
     dd->cra[1] = 1.2 * pointsize;
@@ -4882,6 +4886,8 @@ XFigDeviceDriver(pDevDesc dd, const char *file, const char *paper,
     dd->right = 72 * (xoff + pd->width);	/* right */
     dd->bottom = 72 * yoff;		/* bottom */
     dd->top = 72 * (yoff + pd->height);	/* top */
+    dd->clipLeft = dd->left; dd->clipRight = dd->right;
+    dd->clipBottom = dd->bottom; dd->clipTop = dd->top;
 
     dd->cra[0] = 0.9 * pointsize;
     dd->cra[1] = 1.2 * pointsize;
@@ -6163,6 +6169,8 @@ PDFDeviceDriver(pDevDesc dd, const char *file, const char *paper,
     dd->right = 72 * (xoff + pd->width);	/* right */
     dd->bottom = 72 * yoff;			/* bottom */
     dd->top = 72 * (yoff + pd->height);	/* top */
+    dd->clipLeft = dd->left; dd->clipRight = dd->right;
+    dd->clipBottom = dd->bottom; dd->clipTop = dd->top;
 
     dd->cra[0] = 0.9 * pointsize;
     dd->cra[1] = 1.2 * pointsize;
@@ -6575,7 +6583,7 @@ static void PDFwritesRGBcolorspace(PDFDesc *pd)
     fclose(fp);
 }
 
-#include <time.h>
+#include <time.h>  // for time_t, time, localtime
 #include <Rversion.h>
 
 static void PDF_startfile(PDFDesc *pd)
@@ -7438,6 +7446,7 @@ static void PDF_Circle(double x, double y, double r,
 	       centre = (0.396, 0.347) * size
 	    */
 	    a = 2./0.722 * r;
+	    if (a < 0.01) return; // avoid 0 dims below.
 	    xx = x - 0.396*a;
 	    yy = y - 0.347*a;
 	    tr = (R_OPAQUE(gc->fill)) +
@@ -7746,7 +7755,7 @@ static void PDFSimpleText(double x, double y, const char *str,
     int face = gc->fontface;
     double a, b, bm, rot1;
 
-    if(!R_VIS(gc->col)) return;
+    if(!R_VIS(gc->col) || size <= 0) return;
 
     if(face < 1 || face > 5) {
 	warning(_("attempt to use invalid font %d replaced by font 1"), face);
@@ -7791,7 +7800,7 @@ static void PDF_Text0(double x, double y, const char *str, int enc,
 
     PDF_checkOffline();
 
-    if(!R_VIS(gc->col)) return;
+    if(!R_VIS(gc->col) || size <= 0) return;
 
     if(face < 1 || face > 5) {
 	warning(_("attempt to use invalid font %d replaced by font 1"), face);

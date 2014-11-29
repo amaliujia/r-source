@@ -1,6 +1,6 @@
 % File src/library/stats/man/selfStart.Rd
 % Part of the R package, http://www.R-project.org
-% Copyright 1995-2011 R Core Team
+% Copyright 1995-2013 R Core Team
 % Distributed under GPL 2 or later
 
 \name{selfStart}
@@ -50,7 +50,7 @@ selfStart(model, initial, parameters, template)
 \author{\enc{José}{Jose} Pinheiro and Douglas Bates}
 
 \seealso{
-  \code{\link{nls}}.
+  \code{\link{nls}}, \code{\link{getInitial}}.
   Each of the following are \code{"selfStart"} models (with examples)
 \code{\link{SSasymp}}, \code{\link{SSasympOff}}, \code{\link{SSasympOrig}},
 \code{\link{SSbiexp}}, \code{\link{SSfol}}, \code{\link{SSfpl}},

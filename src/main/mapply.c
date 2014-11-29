@@ -1,6 +1,6 @@
 /*
  *  R : A Computer Language for Statistical Data Analysis
- *  Copyright (C) 2003-12   The R Core Team
+ *  Copyright (C) 2003-2013  The R Core Team
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -87,7 +87,7 @@ do_mapply(SEXP call, SEXP op, SEXP args, SEXP rho)
 	REPROTECT(fcall = LCONS(tmp2, fcall), fi);
 	UNPROTECT(2);
 	if (named && CHAR(STRING_ELT(vnames, j))[0] != '\0')
-	    SET_TAG(fcall, install(translateChar(STRING_ELT(vnames, j))));
+	    SET_TAG(fcall, installTrChar(STRING_ELT(vnames, j)));
     }
 
     REPROTECT(fcall = LCONS(f, fcall), fi);
@@ -103,7 +103,7 @@ do_mapply(SEXP call, SEXP op, SEXP args, SEXP rho)
 		INTEGER(VECTOR_ELT(nindex, j))[0] = (int) counters[j];
 	}
 	SEXP tmp = eval(fcall, rho);
-	if (NAMED(tmp))
+	if (MAYBE_REFERENCED(tmp))
 	    tmp = duplicate(tmp);
 	SET_VECTOR_ELT(ans, i, tmp);
     }

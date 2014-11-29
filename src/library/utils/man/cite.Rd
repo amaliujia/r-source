@@ -1,7 +1,9 @@
 % File src/library/utils/man/cite.Rd
 % Part of the R package, http://www.R-project.org
-% Copyright 2012 R Core Team
+% Copyright 2012-2013 R Core Team
 % Distributed under GPL 2 or later
+
+\newcommand{\sspace}{\ifelse{latex}{\out{~}}{ }}
 
 \name{cite}
 \alias{cite}
@@ -37,7 +39,7 @@ Additional arguments to pass to the \code{cite()} function for the
 default style.
 }
   \item{textual}{
-Produce a \dQuote{textual} style of citation, i.e. what \code{\\citet} would
+Produce a \dQuote{textual} style of citation, i.e.\sspace{}what \code{\\citet} would
 produce in LaTeX.
 }
   \item{before}{

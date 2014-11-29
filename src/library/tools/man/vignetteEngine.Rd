@@ -10,14 +10,14 @@
 \title{Set or Get a Vignette Processing Engine}
 \description{
 Vignettes are normally processed by \code{\link{Sweave}}, but package
-writers may choose to use a different engine (e.g. one provided by the
+writers may choose to use a different engine (e.g., one provided by the
 \CRANpkg{knitr}, \CRANpkg{noweb} or \CRANpkg{R.rsp} packages).  This function
 is used by those packages to register their engines, and internally by
 \R{} to retrieve them.
 }
 \usage{
 vignetteEngine(name, weave, tangle, pattern = NULL,
-	       package = NULL)
+	       package = NULL, aspell = list())
 }
 \arguments{
   \item{name}{the name of the engine.}
@@ -27,6 +27,10 @@ vignetteEngine(name, weave, tangle, pattern = NULL,
     by this engine, or \code{NULL} for the default pattern.}
   \item{package}{the package registering the engine.  By default, this
     is the package calling \code{vignetteEngine}.}
+  \item{aspell}{a list with element names \code{filter} and/or
+    \code{control} giving the respective arguments to be used when spell
+    checking the text in the vignette source file with
+    \code{\link{aspell}}.}
 }
 \details{
 If \code{weave} is missing, \code{vignetteEngine} will return the currently

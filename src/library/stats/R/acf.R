@@ -1,7 +1,7 @@
 #  File src/library/stats/R/acf.R
 #  Part of the R package, http://www.R-project.org
 #
-#  Copyright (C) 1999-2012 The R Core Team
+#  Copyright (C) 1999-2013 The R Core Team
 #
 #  This program is free software; you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
@@ -24,7 +24,7 @@ acf <-
     type <- match.arg(type)
     if(type == "partial") {
         m <- match.call()
-        m[[1L]] <- as.name("pacf")
+        m[[1L]] <- quote(stats::pacf)
         m$type <- NULL
         return(eval(m, parent.frame()))
     }
@@ -75,7 +75,7 @@ pacf.default <- function(x, lag.max = NULL, plot = TRUE,
     if (lag.max < 1) stop("'lag.max' must be at least 1")
 
     if(is.matrix(x)) {
-        if(any(is.na(x))) stop("NAs in 'x'")
+        if(anyNA(x)) stop("NAs in 'x'")
         nser <- ncol(x)
         x <- sweep(x, 2, colMeans(x), check.margin=FALSE)
         lag <- matrix(1, nser, nser)

@@ -153,12 +153,14 @@ void Rwin_fpset(void)
 SEXP in_loadRconsole(SEXP sfile)
 {
     struct structGUI gui;
+    const void *vmax = vmaxget();
 
     if (!isString(sfile) || LENGTH(sfile) < 1)
 	error(_("invalid '%s' argument"), "file");
     getActive(&gui);  /* Will get defaults if there's no active console */
     if (loadRconsole(&gui, translateChar(STRING_ELT(sfile, 0)))) applyGUI(&gui);
     if (strlen(gui.warning)) warning(gui.warning);
+    vmaxset(vmax);
     return R_NilValue;
 }
 
@@ -229,7 +231,7 @@ SEXP do_sysinfo(SEXP call, SEXP op, SEXP args, SEXP rho)
     GetComputerNameW(name, &namelen);
     wcstoutf8(buf, name, 1000);
     SET_STRING_ELT(ans, 3, mkCharCE(buf, CE_UTF8));
-#ifdef WIN64
+#ifdef _WIN64
     SET_STRING_ELT(ans, 4, mkChar("x86-64"));
 #else
     SET_STRING_ELT(ans, 4, mkChar("x86"));
@@ -305,7 +307,7 @@ SEXP in_memsize(SEXP ssize)
 	if (!R_FINITE(mem))
 	    error(_("incorrect argument"));
 #ifdef LEA_MALLOC
-#ifndef WIN64
+#ifndef _WIN64
 	if(mem >= 4096)
 	    error(_("don't be silly!: your machine has a 4Gb address limit"));
 #endif
@@ -522,6 +524,7 @@ SEXP in_shortpath(SEXP paths)
     char tmp[MAX_PATH];
     wchar_t wtmp[32768];
     DWORD res;
+    const void *vmax = vmaxget();
 
     if(!isString(paths)) error(_("'path' must be a character vector"));
 
@@ -548,6 +551,7 @@ SEXP in_shortpath(SEXP paths)
 	}
     }
     UNPROTECT(1);
+    vmaxset(vmax);
     return ans;
 }
     
@@ -830,3 +834,11 @@ SEXP attribute_hidden do_filechoose(SEXP call, SEXP op, SEXP args, SEXP rho)
     UNPROTECT(1);
     return ans;
 }
+
+const char *getTZinfo(void);  // src/extra/tzone/registryTZ.c
+
+SEXP attribute_hidden do_tzone_name(SEXP call, SEXP op, SEXP args, SEXP rho)
+{
+    return mkString(getTZinfo());
+}
+

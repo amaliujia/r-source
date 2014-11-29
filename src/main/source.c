@@ -1,7 +1,7 @@
 /*
  *  R : A Computer Langage for Statistical Data Analysis
  *  Copyright (C) 1995, 1996  Robert Gentleman and Ross Ihaka
- *  Copyright (C) 2001-13     The R Core Team
+ *  Copyright (C) 2001-2013   The R Core Team
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -29,8 +29,7 @@
 #include <IOStuff.h>
 #include <Parse.h>
 #include <Rconnections.h>
-
-extern IoBuffer R_ConsoleIob;
+#include <IOStuff.h> // for R_ConsoleIob;
 
 SEXP attribute_hidden getParseContext(void)
 {
@@ -92,12 +91,16 @@ static void getParseFilename(char* buffer, size_t buflen)
     	if (isEnvironment(R_ParseErrorFile)) {
 	    SEXP filename;
 	    PROTECT(filename = findVar(install("filename"), R_ParseErrorFile));
-	    if (isString(filename) && length(filename))
+	    if (isString(filename) && length(filename)) {
 	        strncpy(buffer, CHAR(STRING_ELT(filename, 0)), buflen - 1);
+                buffer[buflen - 1] = '\0';
+            }
 	    UNPROTECT(1);
-        } else if (isString(R_ParseErrorFile) && length(R_ParseErrorFile)) 
+        } else if (isString(R_ParseErrorFile) && length(R_ParseErrorFile)) {
             strncpy(buffer, CHAR(STRING_ELT(R_ParseErrorFile, 0)), buflen - 1);
-    }           
+            buffer[buflen - 1] = '\0';
+        }
+    }
 }
 
 static SEXP tabExpand(SEXP strings)
@@ -144,7 +147,7 @@ void parseError(SEXP call, int linenum)
 	    error("%s%d:%d: %s\n%d: %s\n%*s",
 		  filename, linenum, R_ParseErrorCol, R_ParseErrorMsg,
 		  R_ParseContextLine, CHAR(STRING_ELT(context, 0)), 
-		  width+R_ParseErrorCol, "^");
+		  width+R_ParseErrorCol+1, "^");
 	    break;
 	default:
 	    width = snprintf(buffer, 10, "%d:", R_ParseContextLine);
@@ -152,7 +155,7 @@ void parseError(SEXP call, int linenum)
 		  filename, linenum, R_ParseErrorCol, R_ParseErrorMsg,
 		  R_ParseContextLine-1, CHAR(STRING_ELT(context, len-2)),
 		  R_ParseContextLine, CHAR(STRING_ELT(context, len-1)), 
-		  width+R_ParseErrorCol, "^");
+		  width+R_ParseErrorCol+1, "^");
 	    break;
 	}
     } else {
@@ -199,6 +202,8 @@ SEXP attribute_hidden do_parse(SEXP call, SEXP op, SEXP args, SEXP env)
     RCNTXT cntxt;
 
     checkArity(op, args);
+    if(!inherits(CAR(args), "connection"))
+	error(_("'file' must be a character string or connection"));
     R_ParseError = 0;
     R_ParseErrorMsg[0] = '\0';
 

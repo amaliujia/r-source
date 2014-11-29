@@ -1,14 +1,15 @@
 % File src/library/stats/man/confint.Rd
 % Part of the R package, http://www.R-project.org
-% Copyright 1995-2007 R Core Team
+% Copyright 1995-2013 R Core Team
 % Distributed under GPL 2 or later
 
 \newcommand{\CRANpkg}{\href{http://CRAN.R-project.org/package=#1}{\pkg{#1}}}
 
 \name{confint}
+\title{Confidence Intervals for Model Parameters}
 \alias{confint}
 \alias{confint.default}
-\title{Confidence Intervals for Model Parameters}
+\alias{confint.lm}
 \description{
   Computes confidence intervals for one or more parameters in a fitted
   model.  There is a default and a method for objects inheriting from class
@@ -52,11 +53,11 @@ fit <- lm(100/mpg ~ disp + hp + wt + am, data = mtcars)
 confint(fit)
 confint(fit, "wt")
 
-## from example(glm) (needs MASS to be present on the system)
+\donttest{## from example(glm)
 counts <- c(18,17,15,20,10,20,25,13,12)
 outcome <- gl(3, 1, 9); treatment <- gl(3, 3)
 glm.D93 <- glm(counts ~ outcome + treatment, family = poisson())
-confint(glm.D93)
-confint.default(glm.D93)  # based on asymptotic normality
+confint(glm.D93) # needs MASS to be present on the system
+confint.default(glm.D93)  # based on asymptotic normality}
 }
 \keyword{models}

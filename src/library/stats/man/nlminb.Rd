@@ -1,6 +1,6 @@
 % File src/library/stats/man/nlminb.Rd
 % Part of the R package, http://www.R-project.org
-% Copyright 1995-2012 R Core Team
+% Copyright 1995-2013 R Core Team
 % Distributed under GPL 2 or later
 
 \name{nlminb}
@@ -8,6 +8,8 @@
 \title{Optimization using PORT routines }
 \description{
   Unconstrained and box-constrained optimization using PORT routines.
+
+  For historical compatibility.
 }
 \usage{
 nlminb(start, objective, gradient = NULL, hessian = NULL, \dots,
@@ -53,8 +55,8 @@ nlminb(start, objective, gradient = NULL, hessian = NULL, \dots,
   \url{http://netlib.bell-labs.com/cm/cs/cstr/153.pdf}.
 
   The parameter vector passed to \code{objective}, \code{gradient} and
-  \code{hessian} has special semantics and is shared between calls.  The
-  functions should not copy it.
+  \code{hessian} had special semantics prior to \R 3.1.0 and was shared
+  between calls.  The functions should not copy it.
 
   If any of the functions returns \code{NA} or \code{NaN} the internal code
   could infinite-loop in \R prior to 2.15.2: this is now an error for
@@ -87,7 +89,7 @@ nlminb(start, objective, gradient = NULL, hessian = NULL, \dots,
     \item{\code{trace}}{The value of the objective function and the parameters
       is printed every trace'th iteration.  Defaults to 0 which
       indicates no trace information is to be printed.}
-    \item{\code{abs.tol}}{Absolute tolerance.  As from \R{} 2.12.0, defaults
+    \item{\code{abs.tol}}{Absolute tolerance.  Defaults
       to 0 so the absolute convergence test is not used.  If the objective
       function is known to be non-negative, the previous default of
       \code{1e-20} would be more appropriate.}% AFCTOL  31
@@ -112,7 +114,7 @@ nlminb(start, objective, gradient = NULL, hessian = NULL, \dots,
   Underlying Fortran code by David M. Gay
 }
 \seealso{
-  \code{\link{optim}} and \code{\link{nlm}}.
+  \code{\link{optim}} (which is preferred) and \code{\link{nlm}}.
 
   \code{\link{optimize}} for one-dimensional minimization and
   \code{\link{constrOptim}} for constrained optimization.

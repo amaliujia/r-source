@@ -6,11 +6,11 @@ include ../../gnuwin32/MkRules
 
 all: makeMakedeps libtz.a zinfo
 
-CPPFLAGS=-I../../include
+CPPFLAGS = -I../../include -I../../main
 
-CSOURCES= localtime.c registryTZ.c
-OBJS=$(CSOURCES:.c=.o)
-libtz.a: $(OBJS)
+CSOURCES = localtime.c registryTZ.c strftime.c
+OBJECTS = $(CSOURCES:.c=.o)
+libtz.a: $(OBJECTS)
 
 zinfo: ../../../share/zoneinfo
 
@@ -22,10 +22,10 @@ clean:
 	@$(RM) *.o *~ *.d Makedeps
 distclean: clean
 	@$(RM) libtz.a
-	@$(RM) -rf ../../../share/zoneinfo
+	@$(RM) -Rf ../../../share/zoneinfo
 
 # Dependencies
-DEPS=$(CSOURCES:.c=.d)
+DEPS = $(CSOURCES:.c=.d)
 
 makeMakedeps: $(DEPS)
 	@$(RM) Makedeps

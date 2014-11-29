@@ -1,7 +1,7 @@
 #  File src/library/utils/R/help.search.R
 #  Part of the R package, http://www.R-project.org
 #
-#  Copyright (C) 1995-2012 The R Core Team
+#  Copyright (C) 1995-2013 The R Core Team
 #
 #  This program is free software; you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
@@ -119,7 +119,7 @@ help.search <-
 	if(!is.character(pattern) || (length(pattern) > 1L))
 	    stop(.wrong_args("pattern"), domain = NA)
 	i <- pmatch(fields, FIELDS)
-	if(any(is.na(i)))
+	if(anyNA(i))
 	    stop("incorrect field specification")
 	else
 	    fields <- FIELDS[i]
@@ -149,7 +149,7 @@ help.search <-
 	stop("do not know what to search")
     }
     i <- pmatch(types, TYPES)
-    if (any(is.na(i)))
+    if (anyNA(i))
 	stop("incorrect type specification")
     else
 	types <- TYPES[i]
@@ -213,7 +213,7 @@ help.search <-
                     if (file.exists(pfile))
                         info <- readRDS(pfile)$DESCRIPTION[c("Package", "Version")]
                     else next
-                    if ( (length(info) != 2L) || any(is.na(info)) ) next
+                    if ( (length(info) != 2L) || anyNA(info) ) next
                     if (!grepl(valid_package_version_regexp, info["Version"])) next
                     ans <- c(ans, nam)
                     paths <- c(paths, file.path(lib, nam))
@@ -277,7 +277,7 @@ help.search <-
 	    ## R 1.8.0.	 If they are missing, we really cannot use
 	    ## the package (as library() will refuse to load it).
 	    ## We always load hsearch.rds to establish the format,
-	    ## sometimes vignettes.rds.
+	    ## sometimes vignette.rds.
 
 	    if(file.exists(hs_file <- file.path(path, "Meta", "hsearch.rds"))) {
 		hDB <- readRDS(hs_file)

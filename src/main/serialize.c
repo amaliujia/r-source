@@ -348,11 +348,11 @@ static int InInteger(R_inpstream_t stream)
     switch (stream->type) {
     case R_pstream_ascii_format:
 	InWord(stream, word, sizeof(word));
-	sscanf(word, "%s", buf);
+	if(sscanf(word, "%s", buf) != 1) error(_("read error"));
 	if (strcmp(buf, "NA") == 0)
 	    return NA_INTEGER;
 	else
-	    sscanf(buf, "%d", &i);
+	    if(sscanf(buf, "%d", &i) != 1) error(_("read error"));
 	return i;
     case R_pstream_binary_format:
 	stream->InBytes(stream, &i, sizeof(int));
@@ -365,6 +365,11 @@ static int InInteger(R_inpstream_t stream)
     }
 }
 
+#ifdef Win32
+extern int trio_sscanf(const char *buffer, const char *format, ...);
+
+#endif
+
 static double InReal(R_inpstream_t stream)
 {
     char word[128];
@@ -374,7 +379,7 @@ static double InReal(R_inpstream_t stream)
     switch (stream->type) {
     case R_pstream_ascii_format:
 	InWord(stream, word, sizeof(word));
-	sscanf(word, "%s", buf);
+	if(sscanf(word, "%s", buf) != 1) error(_("read error"));
 	if (strcmp(buf, "NA") == 0)
 	    return NA_REAL;
 	else if (strcmp(buf, "Inf") == 0)
@@ -382,7 +387,11 @@ static double InReal(R_inpstream_t stream)
 	else if (strcmp(buf, "-Inf") == 0)
 	    return R_NegInf;
 	else
-	    sscanf(buf, "%lg", &d);
+#ifdef Win32
+	    if(trio_sscanf(buf, "%lg", &d) != 1) error(_("read error"));
+#else
+	    if(sscanf(buf, "%lg", &d) != 1) error(_("read error"));
+#endif
 	return d;
     case R_pstream_binary_format:
 	stream->InBytes(stream, &d, sizeof(double));
@@ -2539,7 +2548,7 @@ static SEXP appendRawToFile(SEXP file, SEXP bytes)
 {
     FILE *fp;
     size_t len, out;
-    long pos;
+    long pos;  // what ftell gives: won't work for > 2GB files
     SEXP val;
 
     if (! IS_PROPER_STRING(file))
@@ -2724,7 +2733,7 @@ static SEXP R_getVarsFromFrame(SEXP vars, SEXP env, SEXP forcesxp)
 	if (tmp == R_UnboundValue) {
 /*		PrintValue(env);
 		PrintValue(R_GetTraceback(0)); */  /* DJM debugging */
-	    error(_("object '%s' not found"), CHAR(STRING_ELT(vars, i)));
+	    error(_("object '%s' not found"), EncodeChar(STRING_ELT(vars, i)));
 	    }
 	if (force && TYPEOF(tmp) == PROMSXP) {
 	    PROTECT(tmp);
@@ -2754,7 +2763,7 @@ SEXP R_decompress3(SEXP in, Rboolean *err);
    result to a file.  Returns the key position/length key for
    retrieving the value */
 
-SEXP attribute_hidden
+static SEXP
 R_lazyLoadDBinsertValue(SEXP value, SEXP file, SEXP ascii,
 			SEXP compsxp, SEXP hook)
 {
@@ -2802,7 +2811,8 @@ do_lazyLoadDBfetch(SEXP call, SEXP op, SEXP args, SEXP env)
 	REPROTECT(val = R_decompress2(val, &err), vpi);
     else if (compressed)
 	REPROTECT(val = R_decompress1(val, &err), vpi);
-    if (err) error("lazy-load database '%s' is corrupt", file);
+    if (err) error("lazy-load database '%s' is corrupt",
+		   CHAR(STRING_ELT(file, 0)));
     val = R_unserialize(val, hook);
     if (TYPEOF(val) == PROMSXP) {
 	REPROTECT(val, vpi);

@@ -1,7 +1,7 @@
 /*
  *  R : A Computer Language for Statistical Data Analysis
  *  Copyright (C) 1995, 1996  Robert Gentleman and Ross Ihaka
- *  Copyright (C) 1997--2010  The R Core Team
+ *  Copyright (C) 1997--2013  The R Core Team
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -784,6 +784,7 @@ static char *R_completion_generator(const char *text, int state)
 	    assignCall = PROTECT(lang2(RComp_assignTokenSym, mkString(text))),
 	    completionCall = PROTECT(lang1(RComp_completeTokenSym)),
 	    retrieveCall = PROTECT(lang1(RComp_retrieveCompsSym));
+	const void *vmax = vmaxget();
 
 	eval(assignCall, rcompgen_rho);
 	eval(completionCall, rcompgen_rho);
@@ -797,6 +798,7 @@ static char *R_completion_generator(const char *text, int state)
 		compstrings[i] = strdup(translateChar(STRING_ELT(completions, i)));
 	}
 	UNPROTECT(4);
+	vmaxset(vmax);
     }
 
     if (list_index < ncomp)
@@ -858,7 +860,7 @@ Rstd_ReadConsole(const char *prompt, unsigned char *buf, int len,
 	    char *ob = obuf;
 	    if(!cd) {
 		cd = Riconv_open("", R_StdinEnc);
-		if(!cd) error(_("encoding '%s' is not recognised"), R_StdinEnc);
+		if(cd == (void *)-1) error(_("encoding '%s' is not recognised"), R_StdinEnc);
 	    }
 	    res = Riconv(cd, &ib, &inb, &ob, &onb);
 	    *ob = '\0';
@@ -1014,8 +1016,6 @@ void attribute_hidden Rstd_Busy(int which)
  */
 
 
-/* in platform.c */
-void R_CleanTempDir2(void);
 
 void R_CleanTempDir(void)
 {
@@ -1026,12 +1026,9 @@ void R_CleanTempDir(void)
 	/* On Solaris the working directory must be outside this one */
 	chdir(R_HomeDir());
 #endif
-	char *p = getenv("R_OSX_VALGRIND");
-	if (!p) {
-	    snprintf(buf, 1024, "rm -rf %s", Sys_TempDir);
-	    buf[1023] = '\0';
-	    R_system(buf);
-	} else R_CleanTempDir2();
+	snprintf(buf, 1024, "rm -rf %s", Sys_TempDir);
+	buf[1023] = '\0';
+	R_system(buf);
     }
 }
 
@@ -1161,7 +1158,7 @@ Rstd_ShowFiles(int nfile,		/* number of files */
 	    }
 	    fclose(tfp);
 	}
-	snprintf(buf, 1024, "%s < %s", pager, filename);
+	snprintf(buf, 1024, "'%s' < '%s'", pager, filename); //might contain spaces
 	res = R_system(buf);
 	unlink(filename);
 	free(filename);

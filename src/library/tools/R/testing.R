@@ -3,6 +3,8 @@
 #
 #  Copyright (C) 1995-2013 The R Core Team
 #
+# NB: also copyright date in Usage.
+#
 #  This program is free software; you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
 #  the Free Software Foundation; either version 2 of the License, or
@@ -34,7 +36,12 @@ massageExamples <-
 
     lines <- c(paste0('pkgname <- "', pkg, '"'),
                'source(file.path(R.home("share"), "R", "examples-header.R"))',
-               if (use_gct) "gctorture(TRUE)",
+               if (use_gct) {
+                   gct_n <- as.integer(Sys.getenv("_R_CHECK_GCT_N_", 0))
+                   if(!is.na(gct_n) && gct_n > 0L)
+                       sprintf("gctorture2(%s)", gct_n)
+                   else "gctorture(TRUE)"
+               },
                "options(warn = 1)")
     cat(lines, sep = "\n", file = out)
     if(.Platform$OS.type == "windows")
@@ -44,10 +51,12 @@ massageExamples <-
         cat("base::assign(\".ExTimings\", \"", pkg,
             "-Ex.timings\", pos = 'CheckExEnv')\n", sep="", file = out)
         cat("base::cat(\"name\\tuser\\tsystem\\telapsed\\n\", file=base::get(\".ExTimings\", pos = 'CheckExEnv'))\n", file = out)
+        ## a package left OutDec = "," at the end of an example
         cat("base::assign(\".format_ptime\",",
             "function(x) {",
             "  if(!is.na(x[4L])) x[1L] <- x[1L] + x[4L]",
             "  if(!is.na(x[5L])) x[2L] <- x[2L] + x[5L]",
+            "  options(OutDec = '.')",
             "  format(x[1L:3L], digits = 7L)",
             "},",
             "pos = 'CheckExEnv')\n", sep = "\n", file = out)
@@ -141,9 +150,12 @@ Rdiff <- function(from, to, useDiff = FALSE, forEx = FALSE,
         ## regularize fancy quotes.  First UTF-8 ones:
         txt <- gsub("(\xe2\x80\x98|\xe2\x80\x99)", "'", txt,
                       perl = TRUE, useBytes = TRUE)
+        txt <- gsub("(\xe2\x80\x9c|\xe2\x80\x9d)", '"', txt,
+                      perl = TRUE, useBytes = TRUE)
         if(.Platform$OS.type == "windows") {
             ## not entirely safe ...
-            txt <- gsub("(\x93|\x94)", "'", txt, perl = TRUE, useBytes = TRUE)
+            txt <- gsub("(\x91|\x92)", "'", txt, perl = TRUE, useBytes = TRUE)
+            txt <- gsub("(\x93|\x94)", '"', txt, perl = TRUE, useBytes = TRUE)
             txt <- txt[!grepl('options(pager = "console")', txt,
                               fixed = TRUE, useBytes = TRUE)]
         }
@@ -166,8 +178,12 @@ Rdiff <- function(from, to, useDiff = FALSE, forEx = FALSE,
         right <- clean2(right)
     }
     if (!useDiff && (length(left) == length(right))) {
-        bleft <- gsub("[[:space:]]+", " ", left)
-        bright <- gsub("[[:space:]]+", " ", right)
+        ## The idea is to emulate diff -b, as documented by POSIX:
+        ## http://pubs.opengroup.org/onlinepubs/9699919799/utilities/diff.html
+        bleft <- gsub("[[:space:]]*$", "", left)
+        bright <- gsub("[[:space:]]*$", "", right)
+        bleft <- gsub("[[:space:]]+", " ", bleft)
+        bright <- gsub("[[:space:]]+", " ", bright)
         if(all(bleft == bright))
             return(if(Log) list(status = 0L, out = character()) else 0L)
         cat("\n")
@@ -218,19 +234,39 @@ testInstalledPackages <-
         pkgs <- known_packages$base
     if (scope %in% c("both", "recommended"))
         pkgs <- c(pkgs, known_packages$recommended)
-    ## It *should* be an error if any of these are missing
-    for (pkg in pkgs) {
-        if(is.null(srcdir) && pkg %in% known_packages$base)
-            srcdir <- R.home("tests/Examples")
-        res <- testInstalledPackage(pkg, .Library, outDir, types, srcdir, Ropts)
-        if (res) {
-            status <- 1L
-            msg <- gettextf("testing '%s' failed", pkg)
-            if (errorsAreFatal) stop(msg, domain = NA, call. = FALSE)
-            else warning(msg, domain = NA, call. = FALSE, immediate. = TRUE)
+    mc.cores <- as.integer(Sys.getenv("TEST_MC_CORES", 1L))
+    if (.Platform$OS.type != "windows" &&
+        !is.na(mc.cores) && mc.cores > 1L) {
+        do_one <- function(pkg) {
+            if(is.null(srcdir) && pkg %in% known_packages$base)
+                srcdir <- R.home("tests/Examples")
+            testInstalledPackage(pkg, .Library, outDir, types, srcdir, Ropts)
+        }
+        res <- parallel::mclapply(pkgs, do_one, mc.cores = mc.cores,
+                                  mc.preschedule = FALSE)
+        res <- unlist(res) != 0L
+        if (any(res)) {
+            for(i in which(res))
+                warning(gettextf("testing '%s' failed", pkgs[i]),
+                        domain = NA, call. = FALSE, immediate. = TRUE)
+            if (errorsAreFatal)
+                stop(gettextf("%d of the package tests failed", sum(res)),
+                     domain = NA, call. = FALSE)
+        }
+    } else {
+        for (pkg in pkgs) {
+            if(is.null(srcdir) && pkg %in% known_packages$base)
+                srcdir <- R.home("tests/Examples")
+            res <- testInstalledPackage(pkg, .Library, outDir, types, srcdir, Ropts)
+            if (res) {
+                status <- 1L
+                msg <- gettextf("testing '%s' failed", pkg)
+                if (errorsAreFatal) stop(msg, domain = NA, call. = FALSE)
+                else warning(msg, domain = NA, call. = FALSE, immediate. = TRUE)
+            }
         }
     }
-    return(invisible(status))
+    invisible(status)
 }
 
 testInstalledPackage <-
@@ -466,7 +502,7 @@ testInstalledPackage <-
                          appendLF = FALSE, domain = NA)
     files <- names(db)
     if (pkg == "grDevices")
-        files <- files[!grepl("/unix|windows/", files)]
+        files <- files[!grepl("^(unix|windows)/", files)]
     filedir <- tempfile()
     dir.create(filedir)
     on.exit(unlink(filedir, recursive = TRUE))
@@ -676,7 +712,7 @@ detachPackages <- function(pkgs, verbose = TRUE)
                 R.version[["major"]], ".",  R.version[["minor"]],
                 " (r", R.version[["svn rev"]], ")\n", sep = "")
             cat("",
-                "Copyright (C) 2000-2010 The R Core Team.",
+                "Copyright (C) 2000-2013 The R Core Team.",
                 "This is free software; see the GNU General Public License version 2",
                 "or later for copying conditions.  There is NO warranty.",
                 sep = "\n")

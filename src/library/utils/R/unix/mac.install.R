@@ -1,7 +1,7 @@
 #  File src/library/utils/R/unix/mac.install.R
 #  Part of the R package, http://www.R-project.org
 #
-#  Copyright (C) 1995-2012 The R Core Team
+#  Copyright (C) 1995-2014 The R Core Team
 #
 #  This program is free software; you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
@@ -143,8 +143,10 @@ if(substr(R.version$os, 1L, 6L) != "darwin") {
         ## there is no guarantee we have got the package name right:
         ## foo.zip might contain package bar or Foo or FOO or ....
         ## but we can't tell without trying to unpack it.
-        for(i in seq_along(pkgs))
+        for(i in seq_along(pkgs)) {
+            if(is.na(pkgs[i])) next
             unpackPkg(pkgs[i], pkgnames[i], lib, lock = lock)
+        }
         return(invisible())
     }
     tmpd <- destdir
@@ -160,7 +162,7 @@ if(substr(R.version$os, 1L, 6L) != "darwin") {
     if(is.null(available))
         available <- available.packages(contriburl = contriburl,
                                         method = method)
-    pkgs <- getDependencies(pkgs, dependencies, available, lib)
+    pkgs <- getDependencies(pkgs, dependencies, available, lib, binary = TRUE)
 
     foundpkgs <- download.packages(pkgs, destdir = tmpd, available = available,
                                    contriburl = contriburl, method = method,

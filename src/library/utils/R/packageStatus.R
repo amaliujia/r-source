@@ -1,7 +1,7 @@
 #  File src/library/utils/R/packageStatus.R
 #  Part of the R package, http://www.R-project.org
 #
-#  Copyright (C) 1995-2012 The R Core Team
+#  Copyright (C) 1995-2013 The R Core Team
 #
 #  This program is free software; you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
@@ -24,7 +24,7 @@ packageStatus <- function(lib.loc = NULL, repositories = NULL, method,
         vers <- package_version(x)
 	max <- vers[1L]
         for (i in seq_along(vers)) if (max < vers[i]) max <- vers[i]
-	which(vers == max)[1L]
+	which.max(vers == max)
     }
 
     if(is.null(lib.loc))

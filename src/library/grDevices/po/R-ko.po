@@ -1,27 +1,24 @@
 # Korean translation for R grDevices package
 # src/library/grDevices/po/R-ko.po
-# Copyright (C) 1995-2013 The R Core Team
+# Copyright (C) 1995-2014 The R Core Team
 # This file is distributed under the same license as the R grDevices package.
-# R Development Translation Team - Korean
-# Chel Hee Lee <gnustats@korea.gnu.org>, 2008-2013.
-# Chel Hee Lee <gnustats@gmail.com>, 2008-2013.
+# Chel Hee Lee <chl948@mail.usask.ca>, 2008-2014.
 #
 msgid ""
 msgstr ""
-"Project-Id-Version: R 3.0.0\n"
+"Project-Id-Version: R 3.1.0\n"
 "Report-Msgid-Bugs-To: bugs.r-project.org\n"
-"POT-Creation-Date: 2013-01-12 10:57\n"
-"PO-Revision-Date: 2013-03-09 17:03-0600\n"
-"Last-Translator: Chel Hee Lee <gnustats@gmail.com>\n"
-"Language-Team: R Development Translation Teams (Korean) <gnustats@korea.gnu.org>\n"
+"POT-Creation-Date: 2013-12-18 14:41\n"
+"PO-Revision-Date: 2014-03-26 20:50-0600\n"
+"Last-Translator: Chel Hee Lee <chl948@mail.usask.ca>\n"
+"Language-Team:  <chl948@mail.usask.ca>\n"
 "Language: ko\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=1; plural=0;\n"
-"X-Poedit-Language: Korean\n"
-"X-Poedit-Country: KOREA, REPUBLIC OF\n"
-"X-Poedit-SourceCharset: utf-8\n"
+"X-Poedit-SourceCharset: UTF-8\n"
+"X-Generator: Poedit 1.5.4\n"
 
 msgid "invalid 'filename'"
 msgstr "유효하지 않은 'filename'입니다"
@@ -38,8 +35,14 @@ msgstr "'x'와 'y'의 값들은 증가해야만 합니다"
 msgid "no proper 'z' matrix specified"
 msgstr "적절히 지정된 'z' 행렬이 없습니다"
 
+msgid "dimensions of 'x', 'y' and 'z' do not match"
+msgstr "'x', 'y' 그리고 'z'의 차원들이 일치하지 않습니다"
+
 msgid "'bias' must be positive"
 msgstr "'bias'는 반드시 양수이어야 합니다"
+
+msgid "'alpha' must be false if 'space' is specified"
+msgstr "'space'가 지정되었다면 'alpha'는 반드시 거짓이어야 합니다 "
 
 msgid "at least 3 columns needed"
 msgstr "최소한 3개의 열들이 필요합니다"
@@ -54,7 +57,8 @@ msgid "rgb values must be in [0, maxColorValue]"
 msgstr "rgb 값들은 반드시 [0, maxColorValue]내에 있어야 합니다"
 
 msgid "'start' and 'end' must be distinct and in [0, 1]."
-msgstr "'start'와 'end'는 반드시 다른 값이어야 하고 [0, 1]범위내에 있어야 합니다"
+msgstr ""
+"'start'와 'end'는 반드시 다른 값이어야 하고 [0, 1]범위내에 있어야 합니다"
 
 msgid "'gamma' must be a scalar or 'sRGB'"
 msgstr "'gamma'는 반드시 스칼라 또는 'sRGB'이어야 합니다"
@@ -99,7 +103,7 @@ msgid "cannot copy to the null device"
 msgstr "null 장치에 복사를 할 수 없습니다"
 
 msgid "cannot copy device to itself"
-msgstr ""
+msgstr "디바이스를 자기자신에게 복사할 수 없습니다"
 
 msgid "'device' should be a function"
 msgstr "'device'는 반드시 함수이어야 합니다"
@@ -164,8 +168,8 @@ msgstr "알 수 없는 페밀리 '%s'입니다"
 msgid "invalid 'family' argument"
 msgstr "유효하지 않은 'family' 인자입니다"
 
-msgid "invalid 'file'"
-msgstr "유효하지 않은 'file'입니다"
+msgid "invalid 'file' argument '%s'"
+msgstr "'file' 인자 '%s'가 올바르지 않습니다"
 
 msgid "invalid PDF version"
 msgstr "유효하지 않은 PDF 버전입니다"
@@ -216,7 +220,7 @@ msgid "Invalid output format"
 msgstr "유효하지 않은 출력 포맷입니다"
 
 msgid "status %d in running command '%s'"
-msgstr ""
+msgstr "명령어 '%2$s'를 실행하던 중 상태 %1$d가 되었습니다"
 
 msgid "range too small for 'min.n'"
 msgstr "'min.n'에 대한 범위가 너무 작습니다"
@@ -231,7 +235,8 @@ msgid "a raster array must have exactly 3 dimensions"
 msgstr "래스터 배열은 반드시 정확하게 3차원이어야 합니다"
 
 msgid "a raster array must have exactly 3 or 4 planes"
-msgstr "래스터 배열은 반드시 정확하게 3 또는 4개의 평면들을 가지고 있어야 합니다"
+msgstr ""
+"래스터 배열은 반드시 정확하게 3 또는 4개의 평면들을 가지고 있어야 합니다"
 
 msgid "'drop' is always implicitly FALSE in '[.raster'"
 msgstr "'drop'은 '[.raster'에서 항상 암묵적으로 FALSE입니다"
@@ -251,11 +256,8 @@ msgstr "다음으로부터 기록을 할 수 있는 장치가 없습니다"
 msgid "argument is not of class %s"
 msgstr "인자는 클래스 %s가 아닙니다"
 
-msgid "loading snapshot from pre-3.0.0 R version"
-msgstr "pre-3.0.0 R 버전으로부터 스냅샷을 로딩합니다"
-
-msgid "loading snapshot from different R version"
-msgstr "다른 버전으로부터 스냅샷을 로딩합니다"
+msgid "loading snapshot from a different session"
+msgstr "다른 세션으로부터 스냅샷을 로딩합니다"
 
 msgid "'nbin' must be numeric of length 1 or 2"
 msgstr "'nbin'은 반드시 길이가 1 또는 2인 수치형입니다"
@@ -285,7 +287,8 @@ msgid "at least 2 columns needed"
 msgstr "적어도 2개의 열들이 필요합니다"
 
 msgid "'x' is a list, but does not have components 'x', 'y'  and 'z'"
-msgstr "'x'는 리스트이지만, 컴포넌트 'x', 'y', 그리고 'z'를 가지고 있지 않습니다"
+msgstr ""
+"'x'는 리스트이지만, 컴포넌트 'x', 'y', 그리고 'z'를 가지고 있지 않습니다"
 
 msgid "'x', 'y' and 'z' lengths differ"
 msgstr "'x', 'y' 그리고 'z'의 길이가 다릅니다"
@@ -311,17 +314,23 @@ msgstr "만약 'units = \"px\"'이 아니라면 'res'는 반드시 지정되야 
 msgid "invalid 'title'"
 msgstr "유효하지 않은 'title'입니다"
 
+msgid "invalid 'file'"
+msgstr "유효하지 않은 'file'입니다"
+
 msgid "invalid Quartz font:  must be 4 strings"
 msgstr "유효하지 않은 Quartz 폰트이므로 반드시 4 문자열이어야 합니다"
 
 msgid "invalid arguments in 'quartzFonts' (must be font names)"
-msgstr "'quartzFonts'에 유효하지 않은 인자들이 있습니다 (반드시 폰트명이어야 합니다)"
+msgstr ""
+"'quartzFonts'에 유효하지 않은 인자들이 있습니다 (반드시 폰트명이어야 합니다)"
 
 msgid "invalid arguments in 'quartzFonts' (need named args)"
-msgstr "'quartzFonts'에 유효하지 않은 인자들이 있습니다 (named args가 필요합니다)"
+msgstr ""
+"'quartzFonts'에 유효하지 않은 인자들이 있습니다 (named args가 필요합니다)"
 
 msgid "cairo-based types are not supported on this build - using \"Xlib\""
-msgstr "cairo-기반의 타입들은 현재 빌드에서 지원하지 않습니다 - \"Xlib\"를 이용하세요"
+msgstr ""
+"cairo-기반의 타입들은 현재 빌드에서 지원하지 않습니다 - \"Xlib\"를 이용하세요"
 
 msgid "unknown family for X11(type = \"XLib\")"
 msgstr "X11(type = \"XLib\")에 알 수 없는 페밀리입니다"
@@ -330,10 +339,13 @@ msgid "invalid X11 font specification:"
 msgstr "유효하지 않은 X11 폰트 지정입니다: "
 
 msgid "invalid arguments in 'X11Fonts' (must be font names)"
-msgstr "'X11Fonts'에 유효하지 않은 인자들이 있습니다 (반드시 폰트명이어야 합니다)"
+msgstr ""
+"'X11Fonts'에 유효하지 않은 인자들이 있습니다 (반드시 폰트명이어야 합니다)"
 
 msgid "invalid arguments in 'X11Fonts' (need named args)"
-msgstr "'X11Fonts'에 유효하지 않은 인자들이 있습니다 (반드시 named args를 필요로 합니다)"
+msgstr ""
+"'X11Fonts'에 유효하지 않은 인자들이 있습니다 (반드시 named args를 필요로 합니"
+"다)"
 
 msgid "no such device"
 msgstr "그런 장치가 없습니다"
@@ -363,10 +375,12 @@ msgid "invalid Windows font:  must be a single font family name"
 msgstr "유효한 Windows 폰트가 아닙니다: 반드시 싱글폰트 페밀리명이어야 합니다"
 
 msgid "invalid arguments in 'windowsFonts' (must be font names)"
-msgstr "'windowsFonts'내에 유효하지 않은 인자들입니다 (반드시 폰트명이어야 합니다)"
+msgstr ""
+"'windowsFonts'내에 유효하지 않은 인자들입니다 (반드시 폰트명이어야 합니다)"
 
 msgid "invalid arguments in 'windowsFonts' (need named args)"
-msgstr "'windowsFonts'에 유효하지 않은 인자들입니다 (named args을 필요로 합니다)"
+msgstr ""
+"'windowsFonts'에 유효하지 않은 인자들입니다 (named args을 필요로 합니다)"
 
 msgid "invalid argument name %s in '%s'"
 msgid_plural "invalid argument names %s in '%s'"
@@ -388,3 +402,5 @@ msgid "%d z value <= 0 omitted from logarithmic plot"
 msgid_plural "%d z values <= 0 omitted from logarithmic plot"
 msgstr[0] ""
 
+#~ msgid "loading snapshot from pre-3.0.0 R version"
+#~ msgstr "pre-3.0.0 R 버전으로부터 스냅샷을 로딩합니다"

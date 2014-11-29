@@ -78,11 +78,12 @@ static void PrintLanguageEtc(SEXP, Rboolean, Rboolean);
 
 
 #define TAGBUFLEN 256
-static char tagbuf[TAGBUFLEN + 5];
+#define TAGBUFLEN0 TAGBUFLEN + 6
+static char tagbuf[TAGBUFLEN0];
 
 
 /* Used in X11 module for dataentry */
-/* NB this is called by R.app even though it is in no public header, so 
+/* NB this is called by R.app even though it is in no public header, so
    alter there if you alter this */
 void PrintDefaults(void)
 {
@@ -323,10 +324,11 @@ static void PrintGenericVector(SEXP s, SEXP env)
 {
     int i, taglen, ns, w, d, e, wr, dr, er, wi, di, ei;
     SEXP dims, t, names, newcall, tmp;
-    char pbuf[115], *ptag, save[TAGBUFLEN + 5];
+    char pbuf[115], *ptag, save[TAGBUFLEN0];
 
     ns = length(s);
     if((dims = getAttrib(s, R_DimSymbol)) != R_NilValue && length(dims) > 1) {
+	// special case: array-like list
 	PROTECT(dims);
 	PROTECT(t = allocArray(STRSXP, dims));
 	/* FIXME: check (ns <= R_print.max +1) ? ns : R_print.max; */
@@ -382,6 +384,7 @@ static void PrintGenericVector(SEXP s, SEXP env)
 		break;
 	    case STRSXP:
 		if (LENGTH(tmp) == 1) {
+		    const void *vmax = vmaxget();
 		    /* This can potentially overflow */
 		    const char *ctmp = translateChar(STRING_ELT(tmp, 0));
 		    int len = (int) strlen(ctmp);
@@ -392,6 +395,7 @@ static void PrintGenericVector(SEXP s, SEXP env)
 			pbuf[100] = '"'; pbuf[101] = '\0';
 			strcat(pbuf, " [truncated]");
 		    }
+		    vmaxset(vmax);
 		} else
 		snprintf(pbuf, 115, "Character,%d", LENGTH(tmp));
 		break;
@@ -427,7 +431,7 @@ static void PrintGenericVector(SEXP s, SEXP env)
 	}
 	UNPROTECT(2);
     }
-    else { /* .. no dim() .. */
+    else { // no dim()
 	names = getAttrib(s, R_NamesSymbol);
 	taglen = (int) strlen(tagbuf);
 	ptag = tagbuf + taglen;
@@ -443,7 +447,11 @@ static void PrintGenericVector(SEXP s, SEXP env)
 		if (names != R_NilValue &&
 		    STRING_ELT(names, i) != R_NilValue &&
 		    *CHAR(STRING_ELT(names, i)) != '\0') {
-		    const char *ss = translateChar(STRING_ELT(names, i));
+		    const void *vmax = vmaxget();
+		    /* Bug for L <- list(`a\\b` = 1, `a\\c` = 2)  :
+		       const char *ss = translateChar(STRING_ELT(names, i));
+		    */
+		    const char *ss = EncodeChar(STRING_ELT(names, i));
 		    if (taglen + strlen(ss) > TAGBUFLEN) {
 		    	if (taglen <= TAGBUFLEN)
 			    sprintf(ptag, "$...");
@@ -457,6 +465,7 @@ static void PrintGenericVector(SEXP s, SEXP env)
 			else
 			    sprintf(ptag, "$`%s`", ss);
 		    }
+		    vmaxset(vmax);
 		}
 		else {
 		    if (taglen + IndexWidth(i) > TAGBUFLEN) {
@@ -482,6 +491,7 @@ static void PrintGenericVector(SEXP s, SEXP env)
 			ns - n_pr);
 	}
 	else { /* ns = length(s) == 0 */
+	    const void *vmax = vmaxget();
 	    /* Formal classes are represented as empty lists */
 	    const char *className = NULL;
 	    SEXP klass;
@@ -500,19 +510,23 @@ static void PrintGenericVector(SEXP s, SEXP env)
 		Rprintf("An object of class \"%s\"\n", className);
 		UNPROTECT(1);
 		printAttributes(s, env, TRUE);
+		vmaxset(vmax);
 		return;
 	    }
 	    else {
 		if(names != R_NilValue) Rprintf("named ");
 		Rprintf("list()\n");
 	    }
+	    vmaxset(vmax);
 	}
 	UNPROTECT(1);
     }
     printAttributes(s, env, FALSE);
-}
+} // PrintGenericVector
 
 
+// For pairlist()s only --- the predecessor of PrintGenericVector() above,
+// and hence very similar  (and no longer compatible!)
 static void printList(SEXP s, SEXP env)
 {
     int i, taglen;
@@ -521,6 +535,7 @@ static void printList(SEXP s, SEXP env)
     const char *rn, *cn;
 
     if ((dims = getAttrib(s, R_DimSymbol)) != R_NilValue && length(dims) > 1) {
+	// special case: array-like list
 	PROTECT(dims);
 	PROTECT(t = allocArray(STRSXP, dims));
 	i = 0;
@@ -580,7 +595,7 @@ static void printList(SEXP s, SEXP env)
 	}
 	UNPROTECT(2);
     }
-    else {
+    else { // no dim()
 	i = 1;
 	taglen = (int) strlen(tagbuf);
 	ptag = tagbuf + taglen;
@@ -601,7 +616,7 @@ static void printList(SEXP s, SEXP env)
 		    else if( isValidName(CHAR(PRINTNAME(TAG(s)))) )
 			sprintf(ptag, "$%s", CHAR(PRINTNAME(TAG(s))));
 		    else
-			sprintf(ptag, "$`%s`", CHAR(PRINTNAME(TAG(s))));
+			sprintf(ptag, "$`%s`", EncodeChar(PRINTNAME(TAG(s))));
 		}
 	    }
 	    else {
@@ -757,6 +772,7 @@ void attribute_hidden PrintValueRec(SEXP s, SEXP env)
 	PROTECT(t = getAttrib(s, R_DimSymbol));
 	if (TYPEOF(t) == INTSXP) {
 	    if (LENGTH(t) == 1) {
+		const void *vmax = vmaxget();
 		PROTECT(t = getAttrib(s, R_DimNamesSymbol));
 		if (t != R_NilValue && VECTOR_ELT(t, 0) != R_NilValue) {
 		    SEXP nn = getAttrib(t, R_NamesSymbol);
@@ -770,6 +786,7 @@ void attribute_hidden PrintValueRec(SEXP s, SEXP env)
 		else
 		    printVector(s, 1, R_print.quote);
 		UNPROTECT(1);
+		vmaxset(vmax);
 	    }
 	    else if (LENGTH(t) == 2) {
 		SEXP rl, cl;
@@ -826,7 +843,7 @@ static void printAttributes(SEXP s, SEXP env, Rboolean useSlots)
 {
     SEXP a;
     char *ptag;
-    char save[TAGBUFLEN + 5] = "\0";
+    char save[TAGBUFLEN0] = "\0";
 
     a = ATTRIB(s);
     if (a != R_NilValue) {
@@ -862,11 +879,9 @@ static void printAttributes(SEXP s, SEXP env, Rboolean useSlots)
 	       || TAG(a) == R_WholeSrcrefSymbol || TAG(a) == R_SrcfileSymbol)
 		goto nextattr;
 	    if(useSlots)
-		sprintf(ptag, "Slot \"%s\":",
-			EncodeString(PRINTNAME(TAG(a)), 0, 0, Rprt_adj_left));
+		sprintf(ptag, "Slot \"%s\":", EncodeChar(PRINTNAME(TAG(a))));
 	    else
-		sprintf(ptag, "attr(,\"%s\")",
-			EncodeString(PRINTNAME(TAG(a)), 0, 0, Rprt_adj_left));
+		sprintf(ptag, "attr(,\"%s\")", EncodeChar(PRINTNAME(TAG(a))));
 	    Rprintf("%s", tagbuf); Rprintf("\n");
 	    if (TAG(a) == R_RowNamesSymbol) {
 		/* need special handling AND protection */
@@ -973,6 +988,12 @@ void attribute_hidden PrintValueEnv(SEXP s, SEXP env)
 	}
 	else /* S3 */
 	    PROTECT(call = lang2(install("print"), s));
+
+	if (TYPEOF(s) == SYMSXP || TYPEOF(s) == LANGSXP)
+	    /* If s is not self-evaluating wrap it in a promise. Doing
+	       this unconditionally seems to create problems in the S4
+	       case. */
+	    SETCADR(call, R_mkEVPROMISE(s, s));
 
 	eval(call, env);
 	UNPROTECT(1);

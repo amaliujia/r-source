@@ -148,6 +148,9 @@ SEXP (SET_CXTAIL)(SEXP x, SEXP y);
 #include "Errormsg.h"
 
 extern void R_ProcessEvents(void);
+#ifdef Win32
+extern void R_WaitEvent(void);
+#endif
 
 #ifdef R_USE_SIGNALS
 #ifdef Win32
@@ -255,6 +258,9 @@ extern int putenv(char *string);
 /* seems this is now defined by MinGW to be 259, whereas FILENAME_MAX
    and MAX_PATH are 260.  It is not clear that this really is in bytes,
    but might be chars for the Unicode interfaces.
+
+   260 is d:\ plus 256 chars plus nul.  Some but not all API calls
+   allow filepaths of the form \\?\D:\very_long_path .
 */
 #    define PATH_MAX 260
 #  else
@@ -412,6 +418,19 @@ typedef struct {
 #define LOCK_BINDING(b) ((b)->sxpinfo.gp |= BINDING_LOCK_MASK)
 #define UNLOCK_BINDING(b) ((b)->sxpinfo.gp &= (~BINDING_LOCK_MASK))
 
+#define BASE_SYM_CACHED_MASK (1<<13)
+#define SET_BASE_SYM_CACHED(b) ((b)->sxpinfo.gp |= BASE_SYM_CACHED_MASK)
+#define UNSET_BASE_SYM_CACHED(b) ((b)->sxpinfo.gp &= (~BASE_SYM_CACHED_MASK))
+#define BASE_SYM_CACHED(b) ((b)->sxpinfo.gp & BASE_SYM_CACHED_MASK)
+
+#define SPECIAL_SYMBOL_MASK (1<<12)
+#define SET_SPECIAL_SYMBOL(b) ((b)->sxpinfo.gp |= SPECIAL_SYMBOL_MASK)
+#define UNSET_SPECIAL_SYMBOL(b) ((b)->sxpinfo.gp &= (~SPECIAL_SYMBOL_MASK))
+#define IS_SPECIAL_SYMBOL(b) ((b)->sxpinfo.gp & SPECIAL_SYMBOL_MASK)
+#define SET_NO_SPECIAL_SYMBOLS(b) ((b)->sxpinfo.gp |= SPECIAL_SYMBOL_MASK)
+#define UNSET_NO_SPECIAL_SYMBOLS(b) ((b)->sxpinfo.gp &= (~SPECIAL_SYMBOL_MASK))
+#define NO_SPECIAL_SYMBOLS(b) ((b)->sxpinfo.gp & SPECIAL_SYMBOL_MASK)
+
 #else /* USE_RINTERNALS */
 
 typedef struct VECREC *VECP;
@@ -432,6 +451,17 @@ Rboolean (BINDING_IS_LOCKED)(SEXP b);
 void (SET_ACTIVE_BINDING_BIT)(SEXP b);
 void (LOCK_BINDING)(SEXP b);
 void (UNLOCK_BINDING)(SEXP b);
+
+void (SET_BASE_SYM_CACHED)(SEXP b);
+void (UNSET_BASE_SYM_CACHED)(SEXP b);
+Rboolean (BASE_SYM_CACHED)(SEXP b);
+
+void (SET_SPECIAL_SYMBOL)(SEXP b);
+void (UNSET_SPECIAL_SYMBOL)(SEXP b);
+Rboolean (IS_SPECIAL_SYMBOL)(SEXP b);
+void (SET_NO_SPECIAL_SYMBOLS)(SEXP b);
+void (UNSET_NO_SPECIAL_SYMBOLS)(SEXP b);
+Rboolean (NO_SPECIAL_SYMBOLS)(SEXP b);
 
 #endif /* USE_RINTERNALS */
 
@@ -472,6 +502,7 @@ typedef struct RCNTXT {
     IStackval *intstack;
 #endif
     SEXP srcref;	        /* The source line in effect */
+    int browserfinish;     /* should browser finish this context without stopping */
 } RCNTXT, *context;
 
 /* The Various Context Types.
@@ -585,9 +616,9 @@ extern0 R_size_t R_Collected;	    /* Number of free cons cells (after gc) */
 extern0 int	R_Is_Running;	    /* for Windows memory manager */
 
 /* The Pointer Protection Stack */
-extern0 int	R_PPStackSize	INI_as(R_PPSSIZE); /* The stack size (elements) */
-extern0 int	R_PPStackTop;	    /* The top of the stack */
-extern0 SEXP*	R_PPStack;	    /* The pointer protection stack */
+LibExtern int	R_PPStackSize	INI_as(R_PPSSIZE); /* The stack size (elements) */
+LibExtern int	R_PPStackTop;	    /* The top of the stack */
+LibExtern SEXP*	R_PPStack;	    /* The pointer protection stack */
 
 /* Evaluation Environment */
 extern0 SEXP	R_CurrentExpr;	    /* Currently evaluating expression */
@@ -611,7 +642,7 @@ extern0 int	R_WarnLength	INI_as(1000);	/* Error/warning max length */
 extern0 int	R_nwarnings	INI_as(50);
 extern uintptr_t R_CStackLimit	INI_as((uintptr_t)-1);	/* C stack limit */
 extern uintptr_t R_CStackStart	INI_as((uintptr_t)-1);	/* Initial stack address */
-extern0 int	R_CStackDir	INI_as(1);	/* C stack direction */
+extern int	R_CStackDir	INI_as(1);	/* C stack direction */
 
 #ifdef R_USE_SIGNALS
 extern0 struct RPRSTACK *R_PendingPromises INI_as(NULL); /* Pending promise stack */
@@ -636,7 +667,7 @@ extern0 char	R_StdinEnc[31]  INI_as("");	/* Encoding assumed for stdin */
 /* Objects Used In Parsing  */
 LibExtern int	R_ParseError	INI_as(0); /* Line where parse error occurred */
 extern0 int	R_ParseErrorCol;    /* Column of start of token where parse error occurred */
-extern0 SEXP	R_ParseErrorFile;   /* Source file where parse error was seen.  Either a 
+extern0 SEXP	R_ParseErrorFile;   /* Source file where parse error was seen.  Either a
 				       STRSXP or (when keeping srcrefs) a SrcFile ENVSXP */
 #define PARSE_ERROR_SIZE 256	    /* Parse error messages saved here */
 LibExtern char	R_ParseErrorMsg[PARSE_ERROR_SIZE] INI_as("");
@@ -678,6 +709,7 @@ extern0   void WinCheckUTF8(void);
 
 extern char OutDec	INI_as('.');  /* decimal point used for output */
 extern0 Rboolean R_DisableNLinBrowser	INI_as(FALSE);
+extern0 char R_BrowserLastCommand	INI_as('n');
 
 /* Initialization of the R environment when it is embedded */
 extern int Rf_initEmbeddedR(int argc, char **argv);
@@ -706,6 +738,7 @@ extern0 int R_jit_enabled INI_as(0);
 extern0 int R_compile_pkgs INI_as(0);
 extern SEXP R_cmpfun(SEXP);
 extern void R_init_jit_enabled(void);
+extern void R_initAsignSymbols(void);
 
 LibExtern int R_num_math_threads INI_as(1);
 LibExtern int R_max_num_math_threads INI_as(1);
@@ -740,6 +773,11 @@ extern unsigned int max_contour_segments INI_as(25000);
 /* used in package utils */
 extern Rboolean known_to_be_latin1 INI_as(FALSE);
 extern0 Rboolean known_to_be_utf8 INI_as(FALSE);
+
+/* pre-allocated boolean values */
+LibExtern SEXP R_TrueValue INI_as(NULL);
+LibExtern SEXP R_FalseValue INI_as(NULL);
+LibExtern SEXP R_LogicalNAValue INI_as(NULL);
 
 #ifdef __MAIN__
 # undef extern
@@ -813,6 +851,7 @@ extern0 Rboolean known_to_be_utf8 INI_as(FALSE);
 # define IntegerFromString	Rf_IntegerFromString
 # define internalTypeCheck	Rf_internalTypeCheck
 # define isValidName		Rf_isValidName
+# define installTrChar		Rf_installTrChar
 # define ItemName		Rf_ItemName
 # define jump_to_toplevel	Rf_jump_to_toplevel
 # define KillAllDevices		Rf_KillAllDevices
@@ -970,8 +1009,8 @@ int DispatchAnyOrEval(SEXP, SEXP, const char *, SEXP, SEXP, SEXP*, int, int);
 int DispatchOrEval(SEXP, SEXP, const char *, SEXP, SEXP, SEXP*, int, int);
 int DispatchGroup(const char *, SEXP,SEXP,SEXP,SEXP,SEXP*);
 SEXP duplicated(SEXP, Rboolean);
-int any_duplicated(SEXP, Rboolean);
-int any_duplicated3(SEXP, SEXP, Rboolean);
+R_xlen_t any_duplicated(SEXP, Rboolean);
+R_xlen_t any_duplicated3(SEXP, SEXP, Rboolean);
 int envlength(SEXP);
 SEXP evalList(SEXP, SEXP, SEXP, int);
 SEXP evalListKeepMissing(SEXP, SEXP);
@@ -1021,6 +1060,8 @@ SEXP mkCLOSXP(SEXP, SEXP, SEXP);
 SEXP mkFalse(void);
 SEXP mkPRIMSXP (int, int);
 SEXP mkPROMISE(SEXP, SEXP);
+SEXP R_mkEVPROMISE(SEXP, SEXP);
+SEXP R_mkEVPROMISE_NR(SEXP, SEXP);
 SEXP mkQUOTE(SEXP);
 SEXP mkSYMSXP(SEXP, SEXP);
 SEXP mkTrue(void);
@@ -1063,6 +1104,7 @@ int R_SetOptionWidth(int);
 void R_Suicide(const char *);
 void R_getProcTime(double *data);
 int R_isMissing(SEXP symbol, SEXP rho);
+const char *sexptype2char(SEXPTYPE type);
 void sortVector(SEXP, Rboolean);
 void SrcrefPrompt(const char *, SEXP);
 void ssort(SEXP*,int);
@@ -1078,7 +1120,7 @@ void unmarkPhase(void);
 #endif
 SEXP R_LookupMethod(SEXP, SEXP, SEXP, SEXP);
 int usemethod(const char *, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP*);
-SEXP vectorIndex(SEXP, SEXP, int, int, int, SEXP);
+SEXP vectorIndex(SEXP, SEXP, int, int, int, SEXP, Rboolean);
 
 #ifdef R_USE_SIGNALS
 void begincontext(RCNTXT*, int, SEXP, SEXP, SEXP, SEXP, SEXP);
@@ -1123,9 +1165,10 @@ typedef enum {
 } Rprt_adj;
 
 int	Rstrlen(SEXP, int);
-const char *EncodeRaw(Rbyte);
+const char *EncodeRaw(Rbyte, const char *);
 const char *EncodeString(SEXP, int, int, Rprt_adj);
 const char *EncodeReal2(double, int, int, int);
+const char *EncodeChar(SEXP);
 
 
 /* main/sort.c */
@@ -1157,6 +1200,8 @@ size_t ucstomb(char *s, const unsigned int wc);
 size_t ucstoutf8(char *s, const unsigned int wc);
 size_t mbtoucs(unsigned int *wc, const char *s, size_t n);
 size_t wcstoutf8(char *s, const wchar_t *wc, size_t n);
+
+SEXP Rf_installTrChar(SEXP);
 
 const wchar_t *wtransChar(SEXP x); /* from sysutils.c */
 
@@ -1245,6 +1290,20 @@ extern void *alloca(size_t);
 #else
 # define LDOUBLE double
 #endif
+
+/* int_fast64_t is required by C99/C11
+   Alternative would be to use intmax_t.
+ */
+#ifdef HAVE_INT64_T
+# define LONG_INT int64_t
+# define LONG_INT_MAX INT64_MAX
+#elif defined(HAVE_INT_FAST64_T)
+# define LONG_INT int_fast64_t
+# define LONG_INT_MAX INT_FAST64_MAX
+#endif
+
+// for reproducibility for now: use exp10 or pown later if accurate enough.
+#define Rexp10(x) pow(10.0, x)
 
 #endif /* DEFN_H_ */
 /*

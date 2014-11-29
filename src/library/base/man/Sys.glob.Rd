@@ -1,7 +1,9 @@
 % File src/library/base/man/Sys.glob.Rd
 % Part of the R package, http://www.R-project.org
-% Copyright 1995-2011 R Core Team
+% Copyright 1995-2013 R Core Team
 % Distributed under GPL 2 or later
+
+\newcommand{\sspace}{\ifelse{latex}{\out{~}}{ }}
 
 \name{Sys.glob}
 \alias{Sys.glob}
@@ -34,8 +36,12 @@ Sys.glob(paths, dirmark = FALSE)
 
   All systems should interpret \code{*} (match zero or more characters),
   \code{?} (match a single character) and (probably) \code{[} (begin a
-  character class or range).  By default paths ending in \code{/} will
-  be accepted and matched only to directories.
+  character class or range).  The handling of paths
+  ending with a separator is system-dependent.  On a POSIX-2008
+  compliant OS they will match directories (only), but as they are not
+  valid filepaths on Windows, they match nothing there.  (Earlier POSIX
+  standards allowed them to match files.)
+  % section A.4.12, http://pubs.opengroup.org/onlinepubs/9699919799/xrat/V4_xbd_chap04.html
 
   The rest of these details are indicative (and based on the POSIX
   standard).
@@ -43,8 +49,8 @@ Sys.glob(paths, dirmark = FALSE)
   If a filename starts with \code{.} this may need to be matched
   explicitly: for example \code{Sys.glob("*.RData")} may or may not
   match \file{.RData} but will not usually match \file{.aa.RData}.  Note
-  that this is platform-dependent: e.g. on Solaris \code{Sys.glob("*.*")}
-  matches \file{.} and \file{..}.
+  that this is platform-dependent: e.g.\sspace{}on Solaris
+  \code{Sys.glob("*.*")} matches \file{.} and \file{..}.
 
   \code{[} begins a character class.  If the first character in
   \code{[...]} is not \code{!}, this is a character class which matches
@@ -82,8 +88,9 @@ Sys.glob(paths, dirmark = FALSE)
   filename is OS-dependent.
 
   Character classes can include ranges such as \code{[A-Z]}: include
-  \code{-} as a character by having it first or last in a class.  (In the
-  current implementation ranges are in numeric order of Unicode points.)
+  \code{-} as a character by having it first or last in a class.  (In
+  the current implementation ranges are in the numeric order of Unicode
+  code points.)
 
   One can remove the special meaning of \code{?}, \code{*}  and
   \code{[} by preceding them by a backslash (except within a
@@ -115,7 +122,7 @@ Sys.glob(paths, dirmark = FALSE)
   \link{Quotes} for handling backslashes in character strings.
 }
 \examples{
-\dontrun{
+\donttest{
 Sys.glob(file.path(R.home(), "library", "*", "R", "*.rdx"))
 }}
 \keyword{utilities}

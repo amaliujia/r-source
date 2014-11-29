@@ -1,6 +1,6 @@
 % File src/library/base/man/raw.Rd
 % Part of the R package, http://www.R-project.org
-% Copyright 2004-2012 R Core Team
+% Copyright 2004-2013 R Core Team
 % Distributed under GPL 2 or later
 
 \name{raw}
@@ -34,9 +34,9 @@ is.raw(x)
 \details{
   The raw type is intended to hold raw bytes.  It is possible to extract
   subsequences of bytes, and to replace elements (but only by elements
-  of a raw vector).  The relational operators (see \link{Comparison})
-  work, as do the logical operators (see \link{Logic}) with a bitwise
-  interpretation.
+  of a raw vector).  The relational operators (see \link{Comparison},
+  using the numerical order of the byte representation) work, as do the
+  logical operators (see \link{Logic}) with a bitwise interpretation.
 
   A raw vector is printed with each byte separately represented as a
   pair of hex digits.  If you want to see a character representation
@@ -53,7 +53,7 @@ is.raw(x)
 \seealso{
   \code{\link{charToRaw}}, \code{\link{rawShift}}, etc.
 
-  \code{\link{bitwAnd}} for bitwise operations on raw vectors.
+  \code{\link{&}} for bitwise operations on raw vectors.
 }
 \examples{
 xx <- raw(2)

@@ -1,7 +1,7 @@
 /*
  *  R : A Computer Language for Statistical Data Analysis
  *  Copyright (C) 1995, 1996  Robert Gentleman and Ross Ihaka
- *  Copyright (C) 1998-2012   The R Core Team.
+ *  Copyright (C) 1998-2013   The R Core Team.
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -41,11 +41,6 @@
 #include <errno.h>
 #include <Print.h>
 
-static R_INLINE int imin2(int x, int y)
-{
-    return (x < y) ? x : y;
-}
-
 #include <rlocale.h> /* for btowc */
 
 /* The size of vector initially allocated by scan */
@@ -80,6 +75,8 @@ typedef struct {
     Rboolean isLatin1; /* = FALSE */
     Rboolean isUTF8; /* = FALSE */
     Rboolean atStart;
+    Rboolean embedWarn;
+    Rboolean skipNul;
     char convbuf[100];
 } LocalData;
 
@@ -214,8 +211,17 @@ strtoraw (const char *nptr, char **endptr)
 
 static R_INLINE int scanchar_raw(LocalData *d)
 {
-    return (d->ttyflag) ? ConsoleGetcharWithPushBack(d->con) :
+    int c = (d->ttyflag) ? ConsoleGetcharWithPushBack(d->con) :
 	Rconn_fgetc(d->con);
+    if(c == 0) {
+	if(d->skipNul) {
+	    do {
+		c = (d->ttyflag) ? ConsoleGetcharWithPushBack(d->con) :
+		    Rconn_fgetc(d->con);
+	    } while(c == 0);
+	} else d->embedWarn = TRUE;
+    }
+    return c;
 }
 
 static R_INLINE void unscanchar(int c, LocalData *d)
@@ -816,11 +822,12 @@ static SEXP scanFrame(SEXP what, int maxitems, int maxlines, int flush,
 SEXP attribute_hidden do_scan(SEXP call, SEXP op, SEXP args, SEXP rho)
 {
     SEXP ans, file, sep, what, stripwhite, dec, quotes, comstr;
-    int i, c, nlines, nmax, nskip, flush, fill, blskip, multiline, escapes;
+    int i, c, nlines, nmax, nskip, flush, fill, blskip, multiline, 
+	escapes, skipNul;
     const char *p, *encoding;
     RCNTXT cntxt;
     LocalData data = {NULL, 0, 0, '.', NULL, NO_COMCHAR, 0, NULL, FALSE,
-		      FALSE, 0, FALSE, FALSE};
+		      FALSE, 0, FALSE, FALSE, FALSE, FALSE};
     data.NAstrings = R_NilValue;
 
     checkArity(op, args);
@@ -844,9 +851,10 @@ SEXP attribute_hidden do_scan(SEXP call, SEXP op, SEXP args, SEXP rho)
     escapes = asLogical(CAR(args));args = CDR(args);
     if(!isString(CAR(args)) || LENGTH(CAR(args)) != 1)
 	error(_("invalid '%s' argument"), "encoding");
-    encoding = CHAR(STRING_ELT(CAR(args), 0)); /* ASCII */
+    encoding = CHAR(STRING_ELT(CAR(args), 0)); args = CDR(args); /* ASCII */
     if(streql(encoding, "latin1")) data.isLatin1 = TRUE;
     if(streql(encoding, "UTF-8"))  data.isUTF8 = TRUE;
+    skipNul = asLogical(CAR(args));
 
     if (data.quiet == NA_LOGICAL)		data.quiet = 0;
     if (blskip == NA_LOGICAL)			blskip = 1;
@@ -905,6 +913,9 @@ SEXP attribute_hidden do_scan(SEXP call, SEXP op, SEXP args, SEXP rho)
     if(escapes == NA_LOGICAL)
 	error(_("invalid '%s' argument"), "allowEscapes");
     data.escapes = escapes != 0;
+    if(skipNul == NA_LOGICAL)
+	error(_("invalid '%s' argument"), "skipNul");
+    data.skipNul = skipNul != 0;
 
     i = asInteger(file);
     data.con = getConnection(i);
@@ -972,6 +983,8 @@ SEXP attribute_hidden do_scan(SEXP call, SEXP op, SEXP args, SEXP rho)
     if (!data.ttyflag && !data.wasopen)
 	data.con->close(data.con);
     if (data.quoteset[0]) free(data.quoteset);
+    if (!skipNul && data.embedWarn) 
+	warning(_("embedded nul(s) found in input"));
     return ans;
 }
 
@@ -989,9 +1002,11 @@ SEXP attribute_hidden do_readln(SEXP call, SEXP op, SEXP args, SEXP rho)
 	PROTECT(prompt);
     } else {
 	PROTECT(prompt = coerceVector(prompt, STRSXP));
-	if(length(prompt) > 0)
+	if(length(prompt) > 0) {
 	    strncpy(ConsolePrompt, translateChar(STRING_ELT(prompt, 0)),
 		    CONSOLE_PROMPT_SIZE - 1);
+            ConsolePrompt[CONSOLE_PROMPT_SIZE - 1] = '\0';
+        }
     }
 
     if(R_Interactive) {

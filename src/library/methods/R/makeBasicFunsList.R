@@ -1,7 +1,7 @@
 #  File src/library/methods/R/makeBasicFunsList.R
 #  Part of the R package, http://www.R-project.org
 #
-#  Copyright (C) 1995-2012 The R Core Team
+#  Copyright (C) 1995-2013 The R Core Team
 #
 #  This program is free software; you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
@@ -62,6 +62,7 @@ utils::globalVariables(".addBasicGeneric")
 		 "log", "log10", "log2", "log1p",
 		 "cos", "cosh", "sin", "sinh", "tan", "tanh",
 		 "acos", "acosh", "asin", "asinh", "atan", "atanh",
+		 "cospi", "sinpi", "tanpi",
 		 "gamma", "lgamma", "digamma", "trigamma"
 		 )
     for(f in members) {

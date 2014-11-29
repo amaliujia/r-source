@@ -1,7 +1,7 @@
 #  File src/library/base/R/source.R
 #  Part of the R package, http://www.R-project.org
 #
-#  Copyright (C) 1995-2012 The R Core Team
+#  Copyright (C) 1995-2013 The R Core Team
 #
 #  This program is free software; you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
@@ -69,8 +69,10 @@ function(file, local = FALSE, echo = verbose, print.eval = echo,
             stop("unable to find a plausible encoding")
         if(verbose)
             cat(gettextf('encoding = "%s" chosen', encoding), "\n", sep = "")
-        if(file == "") file <- stdin()
-        else {
+        if(file == "") {
+	    file <- stdin()
+	    srcfile <- "<stdin>"
+        } else {
             filename <- file
 	    file <- file(filename, "r", encoding = encoding)
 	    on.exit(close(file))
@@ -80,8 +82,10 @@ function(file, local = FALSE, echo = verbose, print.eval = echo,
 	    	close(file)
             	srcfile <- srcfilecopy(filename, lines, file.info(filename)[1,"mtime"],
             			       isFile = TRUE)
-	    } else
+	    } else {
             	from_file <- TRUE
+		srcfile <- filename
+	    }
 
             ## We translated the file (possibly via a guess),
             ## so don't want to mark the strings.as from that encoding
@@ -142,9 +146,9 @@ function(file, local = FALSE, echo = verbose, print.eval = echo,
         ## A helper function for echoing source.  This is simpler than the
         ## same-named one in Sweave
 	trySrcLines <- function(srcfile, showfrom, showto) {
-	    lines <- try(suppressWarnings(getSrcLines(srcfile, showfrom, showto)), silent=TRUE)
-	    if (inherits(lines, "try-error")) lines <- character()
-    	    lines
+	    lines <- tryCatch(suppressWarnings(getSrcLines(srcfile, showfrom, showto)),
+			      error = function(e)e)
+	    if (inherits(lines, "error")) character() else lines
 	}
     }
     yy <- NULL
@@ -255,6 +259,6 @@ function(file, envir = baseenv(), chdir = FALSE,
 	on.exit(setwd(owd), add = TRUE)
 	setwd(path)
     }
-    for (i in exprs) eval(i, envir)
+    for (i in seq_along(exprs)) eval(exprs[i], envir)
     invisible()
 }

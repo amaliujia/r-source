@@ -1,7 +1,7 @@
 #  File src/library/methods/R/MethodsList.R
 #  Part of the R package, http://www.R-project.org
 #
-#  Copyright (C) 1995-2012 The R Core Team
+#  Copyright (C) 1995-2013 The R Core Team
 #
 #  This program is free software; you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
@@ -552,7 +552,7 @@ matchSignature <-
     ## Assertion:  match.call has permuted the args into the order of formal args,
     ## and carried along the values.  Get the supplied classes in that
     ## order, from the matched args in the call object.
-    if(any(is.na(which)))
+    if(anyNA(which))
         stop(sprintf(ngettext(sum(is.na(which)),
                               "in the method signature for function %s invalid argument name in the signature: %s",
                               "in the method signature for function %s invalid argument names in the signature: %s"),

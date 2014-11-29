@@ -1,6 +1,6 @@
 % File src/library/graphics/man/filled.contour.Rd
 % Part of the R package, http://www.R-project.org
-% Copyright 1995-2012 R Core Team
+% Copyright 1995-2013 R Core Team
 % Distributed under GPL 2 or later
 
 \newcommand{\CRANpkg}{\href{http://CRAN.R-project.org/package=#1}{\pkg{#1}}}
@@ -80,8 +80,8 @@ filled.contour(x = seq(0, 1, length.out = nrow(z)),
   is a single \code{NA} value the triangle opposite the \code{NA} is
   omitted.
 
-  As from \R 2.14.1 values to be plotted can be infinite: the effect is
-  similar to that described for \code{NA} values.
+  Values to be plotted can be infinite: the effect is similar to that
+  described for \code{NA} values.
 
   \code{.filled.contour} is a \sQuote{bare bones} interface to add
   just the contour plot to an already-set-up plot region.  It is is

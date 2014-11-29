@@ -1,6 +1,6 @@
 % File src/library/utils/man/PkgUtils.Rd
 % Part of the R package, http://www.R-project.org
-% Copyright 1995-2012 R Core Team
+% Copyright 1995-2013 R Core Team
 % Distributed under GPL 2 or later
 
 \name{PkgUtils}
@@ -30,8 +30,8 @@
 
   \command{R CMD build} builds \R source tarballs.  The name(s) of the
   packages are taken from the \file{DESCRIPTION} files and not from the
-  directory names.  As from \R 2.13.0 this works entirely on a copy of
-  the supplied source directories.
+  directory names. This works entirely on a copy of the supplied source
+  directories.
 
   Use \command{R CMD \var{foo} --help} to obtain usage information on
   utility \code{\var{foo}}.

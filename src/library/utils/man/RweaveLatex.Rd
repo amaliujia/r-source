@@ -1,7 +1,9 @@
 % File src/library/utils/man/RweaveLatex.Rd
 % Part of the R package, http://www.R-project.org
-% Copyright 1995-2012 R Core Team
+% Copyright 1995-2013 R Core Team
 % Distributed under GPL 2 or later
+
+\newcommand{\sspace}{\ifelse{latex}{\out{~}}{ }}
 
 \name{RweaveLatex}
 \alias{RweaveLatex}
@@ -50,8 +52,8 @@ RweaveLatexSetup(file, syntax, output = NULL, quiet = FALSE,
   unset or empty.  If set, it should be exactly \code{TRUE} or
   \code{FALSE}: any other values are taken as \code{FALSE}.
 
-  As from \R 2.12.0, the simplest way for frequent Sweave users to ensure
-  that \file{Sweave.sty} is in the TeX input path is to add
+  The simplest way for frequent Sweave users to ensure that
+  \file{Sweave.sty} is in the TeX input path is to add
   \file{\var{R_HOME}/share/texmf} as a \sQuote{texmf tree} (\sQuote{root
   directory} in the parlance of the \sQuote{MiKTeX settings} utility).
 
@@ -87,6 +89,10 @@ RweaveLatexSetup(file, syntax, output = NULL, quiet = FALSE,
   suppresses the use of the \samp{ae} package, the use of which may
   interfere with certain encoding and typeface selections.  If you have
   problems in the rendering of certain character sets, try this option.
+
+  As from \R 3.1.0 it also supports the \samp{[inconsolata]} option, to
+  render monospaced text in \code{inconsolata}, the font used by default
+  for \R help pages.
 
   The use of fancy quotes (see \code{\link{sQuote}}) can cause problems
   when setting \R output.  Either set
@@ -228,8 +234,7 @@ RweaveLatexSetup(file, syntax, output = NULL, quiet = FALSE,
 
   In addition, users can specify further options, either in the header
   of an individual code section or in a \samp{\\SweaveOpts\{\}} line in
-  the document. Prior to \R 2.14.0 unknown options were taken as
-  logical: now their type is set at first use.
+  the document. For unknown options, their type is set at first use.
 }
 
 \section{Custom Graphics Devices}{
@@ -252,7 +257,7 @@ my.Swd <- function(name, width, height, ...)
   different devices can be used for different chunks.
 
   A replacement for \code{\link{dev.off}} can be provided as a function
-  with suffix \code{.off}, e.g. \code{my.Swd.off()}.
+  with suffix \code{.off}, e.g.\sspace{}\code{my.Swd.off()}.
 }
 
 \section{Hook Functions}{

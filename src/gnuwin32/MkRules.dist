@@ -6,6 +6,7 @@
 ## =========== configuration macros for building packages ================
 # Absolute path to '/usr/local' software collection.  The versions used
 # on CRAN can be found under http://www.stats.ox.ac.uk/pub/Rtools/goodies
+# It can be interrogated by 'R CMD config LOCAL_SOFT'
 LOCAL_SOFT =
 
 ## ============== configuration macros for building R ===================
@@ -60,13 +61,16 @@ WIN = 32
 # Has been needed for some versions of MinGW-w64
 # USE_IMPLIBS = YES
 
+# some toolchains set up for the 'medium code' model need
+# NM_FILTER = | $(SED) -e '/.refptr./d'
 ### END more detailed options
 
 
-# set to use ICU (experimental)
-# USE_ICU=YES
+# set to use ICU
+# USE_ICU = YES
 # path to parent of ICU headers
-ICU_PATH=/sources/icu
+ICU_PATH = /path/to/ICU
+ICU_LIBS = -lsicuin -lsicuuc -lsicudt -lstdc++
 
 # optional overrides for making bitmapdll: names of source directories
 # JPEGDIR = jpeg-9
@@ -87,8 +91,14 @@ BUILD_HTML = NO
 # unset this if you are *not* using MiKTeX
 MIKTEX = TRUE
 
-# additional optimization flags
-EOPTS=-mtune=core2
+# for texinfo < 5.0
+MAKEINFO = makeinfo
+# for texinfo >= 5.0.  Might also need -I/path/to/modules
+# MAKEINFO = /path/to/perl /path/to/texi2any
+# or perhaps something like
+
+# additional optimization flags (use -mtune=native for a private build)
+EOPTS = -mtune=core2
 
 # define to -fopenmp if the toolchain has OpenMP support
 OPENMP = -fopenmp

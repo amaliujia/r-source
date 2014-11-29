@@ -1,9 +1,10 @@
 % File src/library/stats/man/contrasts.Rd
 % Part of the R package, http://www.R-project.org
-% Copyright 1995-2007 R Core Team
+% Copyright 1995-2013 R Core Team
 % Distributed under GPL 2 or later
 
 \newcommand{\CRANpkg}{\href{http://CRAN.R-project.org/package=#1}{\pkg{#1}}}
+\newcommand{\sspace}{\ifelse{latex}{\out{~}}{ }}
 
 \name{contrasts}
 \alias{contrasts}
@@ -46,7 +47,7 @@ contrasts(x, how.many) <- value
   an identity matrix is returned.  Suitable functions have a first
   argument which is the character vector of levels, a named argument
   \code{contrasts} (always called with \code{contrasts = TRUE}) and
-  optionally from \R 2.10.0 a logical argument \code{sparse}.
+  optionally a logical argument \code{sparse}.
 
   If \code{value} supplies more than \code{how.many} contrasts, the
   first \code{how.many} are used.  If too few are supplied, a suitable
@@ -82,11 +83,11 @@ contrasts(fff, 2) <- contr.sum(5); contrasts(fff)  # set 2 contrasts
 # supply 2 contrasts, compute 2 more to make full set of 4.
 contrasts(fff) <- contr.sum(5)[, 1:2]; contrasts(fff)
 
-## using sparse contrasts: % useful, once model.matrix() works with these :
+\donttest{## using sparse contrasts: % useful, once model.matrix() works with these :
 ffs <- fff
 contrasts(ffs) <- contr.sum(5, sparse = TRUE)[, 1:2]; contrasts(ffs)
 stopifnot(all.equal(ffs, fff))
 contrasts(ffs) <- contr.sum(5, sparse = TRUE); contrasts(ffs)
-}
+}}
 \keyword{design}
 \keyword{regression}

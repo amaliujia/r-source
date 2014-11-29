@@ -1,7 +1,7 @@
 #  File src/library/tcltk/R/tkGUI.R
 #  Part of the R package, http://www.R-project.org
 #
-#  Copyright (C) 1995-2012 The R Core Team
+#  Copyright (C) 1995-2013 The R Core Team
 #
 #  This program is free software; you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
@@ -15,6 +15,11 @@
 #
 #  A copy of the GNU General Public License is available at
 #  http://www.r-project.org/Licenses/
+
+if (.Platform$OS.type == "windows") {
+    utils::globalVariables(".C_RTcl_ActivateConsole")
+    utils::suppressForeignCheck(".C_RTcl_ActivateConsole")
+}
 
 tkStartGUI <- function()
 {

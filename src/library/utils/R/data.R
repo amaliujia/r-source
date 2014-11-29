@@ -1,7 +1,7 @@
 #  File src/library/utils/R/data.R
 #  Part of the R package, http://www.R-project.org
 #
-#  Copyright (C) 1995-2012 The R Core Team
+#  Copyright (C) 1995-2013 The R Core Team
 #
 #  This program is free software; you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
@@ -171,7 +171,7 @@ function(..., list = character(), package = NULL, lib.loc = NULL,
                             Rdatadir <- tempfile("Rdata")
                             dir.create(Rdatadir, showWarnings=FALSE)
                             topic <- basename(file)
-                            rc <- .Call(C_unzip, zipname, topic, Rdatadir, FALSE, TRUE, FALSE)
+                            rc <- .External(C_unzip, zipname, topic, Rdatadir, FALSE, TRUE, FALSE, FALSE)
                             if(rc == 0L) zfile <- file.path(Rdatadir, topic)
                         }
                         if(zfile != file) on.exit(unlink(zfile))

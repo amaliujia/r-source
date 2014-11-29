@@ -1,7 +1,7 @@
 /*
  *  R : A Computer Language for Statistical Data Analysis
  *  Copyright (C) 1995, 1996  Robert Gentleman and Ross Ihaka
- *  Copyright (C) 1997--2012  The R Core Team
+ *  Copyright (C) 1997--2014  The R Core Team
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Pulic License as published by
@@ -55,6 +55,9 @@ strsplit grep [g]sub [g]regexpr
 
 /* interval at which to check interrupts */
 #define NINTERRUPT 1000000
+
+/* How many encoding warnings to give */
+#define NWARN 5
 
 #include <Defn.h>
 #include <Internal.h>
@@ -141,6 +144,7 @@ SEXP attribute_hidden do_strsplit(SEXP call, SEXP op, SEXP args, SEXP env)
     const unsigned char *tables = NULL;
     Rboolean use_UTF8 = FALSE, haveBytes = FALSE;
     const void *vmax, *vmax2;
+    int nwarn = 0;
 
     checkArity(op, args);
     x = CAR(args); args = CDR(args);
@@ -217,14 +221,16 @@ SEXP attribute_hidden do_strsplit(SEXP call, SEXP op, SEXP args, SEXP env)
 		else if (use_UTF8) {
 		    buf = translateCharUTF8(STRING_ELT(x, i));
 		    if (!utf8Valid(buf)) {
-			warning(_("input string %d is invalid UTF-8"), i+1);
+			if(nwarn++ < NWARN)
+			    warning(_("input string %d is invalid UTF-8"), i+1);
 			SET_VECTOR_ELT(ans, i, ScalarString(NA_STRING));
 			continue;
 		    }
 		} else {
 		    buf = translateChar(STRING_ELT(x, i));
 		    if (mbcslocale && !mbcsValid(buf)) {
-			warning(_("input string %d is invalid in this locale"), i+1);
+			if(nwarn++ < NWARN)
+			    warning(_("input string %d is invalid in this locale"), i+1);
 			SET_VECTOR_ELT(ans, i, ScalarString(NA_STRING));
 			continue;
 		    }
@@ -305,14 +311,16 @@ SEXP attribute_hidden do_strsplit(SEXP call, SEXP op, SEXP args, SEXP env)
 		else if (use_UTF8) {
 		    buf = translateCharUTF8(STRING_ELT(x, i));
 		    if (!utf8Valid(buf)) {
-			warning(_("input string %d is invalid UTF-8"), i+1);
+			if(nwarn++ < NWARN)
+			    warning(_("input string %d is invalid UTF-8"), i+1);
 			SET_VECTOR_ELT(ans, i, ScalarString(NA_STRING));
 			continue;
 		    }
 		} else {
 		    buf = translateChar(STRING_ELT(x, i));
 		    if (mbcslocale && !mbcsValid(buf)) {
-			warning(_("input string %d is invalid in this locale"), i+1);
+			if(nwarn++ < NWARN)
+			    warning(_("input string %d is invalid in this locale"), i+1);
 			SET_VECTOR_ELT(ans, i, ScalarString(NA_STRING));
 			continue;
 		    }
@@ -413,14 +421,16 @@ SEXP attribute_hidden do_strsplit(SEXP call, SEXP op, SEXP args, SEXP env)
 		else if (use_UTF8) {
 		    buf = translateCharUTF8(STRING_ELT(x, i));
 		    if (!utf8Valid(buf)) {
-			warning(_("input string %d is invalid UTF-8"), i+1);
+			if(nwarn++ < NWARN)
+			    warning(_("input string %d is invalid UTF-8"), i+1);
 			SET_VECTOR_ELT(ans, i, ScalarString(NA_STRING));
 			continue;
 		    }
 		} else {
 		    buf = translateChar(STRING_ELT(x, i));
 		    if (mbcslocale && !mbcsValid(buf)) {
-			warning(_("input string %d is invalid in this locale"), i+1);
+			if(nwarn++ < NWARN)
+			    warning(_("input string %d is invalid in this locale"), i+1);
 			SET_VECTOR_ELT(ans, i, ScalarString(NA_STRING));
 			continue;
 		    }
@@ -575,7 +585,8 @@ SEXP attribute_hidden do_strsplit(SEXP call, SEXP op, SEXP args, SEXP env)
 		else {
 		    buf = translateChar(STRING_ELT(x, i));
 		    if (mbcslocale && !mbcsValid(buf)) {
-			warning(_("input string %d is invalid in this locale"), i+1);
+			if(nwarn++ < NWARN)
+			    warning(_("input string %d is invalid in this locale"), i+1);
 			SET_VECTOR_ELT(ans, i, ScalarString(NA_STRING));
 			continue;
 		    }
@@ -740,6 +751,7 @@ SEXP attribute_hidden do_grep(SEXP call, SEXP op, SEXP args, SEXP env)
     const unsigned char *tables = NULL /* -Wall */;
     Rboolean use_UTF8 = FALSE, use_WC =  FALSE;
     const void *vmax;
+    int nwarn = 0;
 
     checkArity(op, args);
     pat = CAR(args); args = CDR(args);
@@ -790,11 +802,13 @@ SEXP attribute_hidden do_grep(SEXP call, SEXP op, SEXP args, SEXP env)
     if (!useBytes) {
 	Rboolean onlyASCII = IS_ASCII(STRING_ELT(pat, 0));
 	if (onlyASCII)
-	    for (i = 0; i < n; i++)
+	    for (i = 0; i < n; i++) {
+	        if(STRING_ELT(text, i) == NA_STRING) continue;
 		if (!IS_ASCII(STRING_ELT(text, i))) {
 		    onlyASCII = FALSE;
 		    break;
 		}
+	    }
 	useBytes = onlyASCII;
     }
     if (!useBytes) {
@@ -880,13 +894,15 @@ SEXP attribute_hidden do_grep(SEXP call, SEXP op, SEXP args, SEXP env)
 	    else if (use_UTF8) {
 		s = translateCharUTF8(STRING_ELT(text, i));
 		if (!utf8Valid(s)) {
-		    warning(_("input string %d is invalid UTF-8"), i+1);
+		    if(nwarn++ < NWARN)
+			warning(_("input string %d is invalid UTF-8"), i+1);
 		    continue;
 		}
 	    } else {
 		s = translateChar(STRING_ELT(text, i));
 		if (mbcslocale && !mbcsValid(s)) {
-		    warning(_("input string %d is invalid in this locale"), i+1);
+		    if(nwarn++ < NWARN)
+			warning(_("input string %d is invalid in this locale"), i+1);
 		    continue;
 		}
 	    }
@@ -1530,11 +1546,13 @@ SEXP attribute_hidden do_gsub(SEXP call, SEXP op, SEXP args, SEXP env)
     if (!useBytes) {
 	Rboolean onlyASCII = IS_ASCII(STRING_ELT(pat, 0));
 	if (onlyASCII)
-	    for (i = 0; i < n; i++)
+	    for (i = 0; i < n; i++) {
+	    	if(STRING_ELT(text, i) == NA_STRING) continue;
 		if (!IS_ASCII(STRING_ELT(text, i))) {
 		    onlyASCII = FALSE;
 		    break;
 		}
+	    }
 	useBytes = onlyASCII;
     }
     if (!useBytes) {
@@ -2299,6 +2317,7 @@ SEXP attribute_hidden do_regexpr(SEXP call, SEXP op, SEXP args, SEXP env)
 	name_count, name_entry_size, info_code;
     char *name_table;
     SEXP capture_names = R_NilValue;
+    int nwarn = 0;
 
     checkArity(op, args);
     pat = CAR(args); args = CDR(args);
@@ -2331,11 +2350,13 @@ SEXP attribute_hidden do_regexpr(SEXP call, SEXP op, SEXP args, SEXP env)
     if (!useBytes) {
 	Rboolean onlyASCII = IS_ASCII(STRING_ELT(pat, 0));
 	if (onlyASCII)
-	    for (i = 0; i < n; i++)
+	    for (i = 0; i < n; i++) {
+	        if(STRING_ELT(text, i) == NA_STRING) continue;
 		if (!IS_ASCII(STRING_ELT(text, i))) {
 		    onlyASCII = FALSE;
 		    break;
 		}
+	    }
 	useBytes = onlyASCII;
     }
     if (!useBytes) {
@@ -2470,14 +2491,16 @@ SEXP attribute_hidden do_regexpr(SEXP call, SEXP op, SEXP args, SEXP env)
 		else if (use_UTF8) {
 		    s = translateCharUTF8(STRING_ELT(text, i));
 		    if (!utf8Valid(s)) {
-			warning(_("input string %d is invalid UTF-8"), i+1);
+			if(nwarn++ < NWARN)
+			    warning(_("input string %d is invalid UTF-8"), i+1);
 			INTEGER(ans)[i] = INTEGER(matchlen)[i] = -1;
 			continue;
 		    }
 		} else {
 		    s = translateChar(STRING_ELT(text, i));
 		    if (mbcslocale && !mbcsValid(s)) {
-			warning(_("input string %d is invalid in this locale"), i+1);
+			if(nwarn++ < NWARN)
+			    warning(_("input string %d is invalid in this locale"), i+1);
 			INTEGER(ans)[i] = INTEGER(matchlen)[i] = -1;
 			continue;
 		    }
@@ -2545,8 +2568,9 @@ SEXP attribute_hidden do_regexpr(SEXP call, SEXP op, SEXP args, SEXP env)
 		    } else
 			s = translateChar(STRING_ELT(text, i));
 		    if (!useBytes && !use_UTF8 && mbcslocale && !mbcsValid(s)) {
-			warning(_("input string %d is invalid in this locale"),
-				i+1);
+			if (nwarn++ < NWARN)
+			    warning(_("input string %d is invalid in this locale"),
+				    i+1);
 			elt = gregexpr_BadStringAns();
 		    } else {
 			if (fixed_opt)

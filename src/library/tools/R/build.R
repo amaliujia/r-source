@@ -23,104 +23,8 @@
 ## be what commandArgs(TRUE) would return, that is a character vector
 ## of (space-delimited) terms that would be passed to R CMD build.
 
-
-### emulation of Perl Logfile.pm
-
-newLog <- function(filename = "")
-{
-    con <- if(nzchar(filename)) file(filename, "wt") else 0L
-
-    Log <- new.env(parent = emptyenv())
-    Log$con <- con
-    Log$filename <- filename
-    Log$stars <- "*"
-    Log$warnings <- 0L
-    Log$notes <- 0L
-
-    Log
-}
-
-closeLog <- function(Log) if (Log$con > 2L) close(Log$con)
-
-printLog <- function(Log, ...)
-{
-    quotes <- function(x) gsub("'([^']*)'", sQuote("\\1"), x)
-    args <- lapply(list(...), quotes)
-    do.call(cat, c(args, sep = ""))
-    if (Log$con > 0L) do.call(cat, c(args, sep = "", file = Log$con))
-}
-
-printLog0 <- function(Log, ...)
-{
-    cat(..., sep = "")
-    if (Log$con > 0L) cat(..., file = Log$con, sep = "")
-}
-
-## unused
-## setStars <- function(Log, stars) {Log$stars <- stars; Log}
-
-checkingLog <- function(Log, ...)
-    printLog(Log, Log$stars, " checking ", ..., " ...")
-
-creatingLog <- function(Log, text)
-    printLog(Log, Log$stars, " creating ", text, " ...")
-
-messageLog <- function(Log, ...)
-    printLog(Log, Log$stars, " ", ..., "\n")
-
-resultLog <- function(Log, text)
-    printLog(Log, " ", text, "\n")
-
-errorLog <- function(Log, ...)
-{
-    resultLog(Log, "ERROR")
-    text <- paste0(...)
-    if (length(text) && nzchar(text)) printLog(Log, ..., "\n")
-}
-
-## <NOTE>
-## Perhaps the arguments to errorLog(), warningLog() and noteLog()
-## should be synchronized?
-## </NOTE>
-
-warningLog <- function(Log, text = "")
-{
-    resultLog(Log, "WARNING")
-    if(nzchar(text)) printLog(Log, text, "\n")
-    Log$warnings <- Log$warnings + 1L
-}
-
-noteLog <- function(Log, text = "")
-{
-    resultLog(Log, "NOTE")
-    if(nzchar(text)) printLog(Log, text, "\n")
-    Log$notes <- Log$notes + 1L
-}
-
-summaryLog <- function(Log)
-{
-    if((Log$warnings > 0L) || (Log$notes > 0L)) {
-        if(Log$warnings > 1L)
-            printLog(Log,
-                     sprintf("WARNING: There were %d warnings.\n",
-                             Log$warnings))
-        else if(Log$warnings == 1L)
-            printLog(Log,
-                     sprintf("WARNING: There was 1 warning.\n"))
-        if(Log$notes > 1L)
-            printLog(Log,
-                     sprintf("NOTE: There were %d notes.\n",
-                             Log$notes))
-        else if(Log$notes == 1L)
-            printLog(Log,
-                     sprintf("NOTE: There was 1 note.\n"))
-        printLog(Log,
-                 sprintf("See\n  %s\nfor details.\n", sQuote(Log$filename)))
-    }
-}
-
 writeDefaultNamespace <-
-    function(filename, desc = file.path(dirname(filename), "DESCRIPTION"))
+function(filename, desc = file.path(dirname(filename), "DESCRIPTION"))
 {
     pkgInfo <- .split_description(.read_description(desc))
     pkgs <- unique(c(names(pkgInfo$Imports), names(pkgInfo$Depends)))
@@ -284,7 +188,7 @@ get_exclude_patterns <- function()
 	res <- system_with_capture(cmd, args)
 	if (res$status) {
 	    printLog(Log, "      -----------------------------------\n")
-	    printLog(Log, paste(c(res$stdout, ""),  collapse = "\n"))
+	    printLog0(Log, paste(c(res$stdout, ""),  collapse = "\n"))
 	    printLog(Log, "      -----------------------------------\n")
 	    unlink(libdir, recursive = TRUE)
 	    printLog(Log, "ERROR: package installation failed\n")
@@ -313,6 +217,13 @@ get_exclude_patterns <- function()
 
         libdir <- tempfile("Rinst")
 
+        ensure_installed <- function()
+	    if (!pkgInstalled) {
+		messageLog(Log,
+			   "installing the package to build vignettes")
+		pkgInstalled <<- temp_install_pkg(pkgdir, libdir)
+	    }
+
         pkgInstalled <- build_Rd_db(pkgdir, libdir, desc)
 
         if (file.exists("INDEX")) update_Rd_index("INDEX", "man", Log)
@@ -324,15 +235,17 @@ get_exclude_patterns <- function()
         }
         if (vignettes &&
             parse_description_field(desc, "BuildVignettes", TRUE)) {
-            ## Look for vignette sources
-            vigns <- pkgVignettes(dir = '.')
-            if (!is.null(vigns) && length(vigns$docs)) {
-                if (!pkgInstalled) {
-                    messageLog(Log,
-                               "installing the package to re-build vignettes")
-                    pkgInstalled <- temp_install_pkg(pkgdir, libdir)
-                }
+## this is not a logical field
+##	    if (nchar(parse_description_field(desc, "VignetteBuilder", "")))
+##		ensure_installed()
+            ## PR#15775: check VignetteBuilder packages are installed
+            ## This is a bit wasteful: we do not need them in this process
+            loadVignetteBuilder(pkgdir, TRUE)
 
+            ## Look for vignette sources
+            vigns <- pkgVignettes(dir = '.', check = TRUE)
+            if (!is.null(vigns) && length(vigns$docs)) {
+                ensure_installed()
                 ## Good to do this in a separate process: it might die
                 creatingLog(Log, "vignettes")
                 R_LIBS <- Sys.getenv("R_LIBS", NA_character_)
@@ -343,10 +256,9 @@ get_exclude_patterns <- function()
                     on.exit(Sys.unsetenv("R_LIBS"), add = TRUE)
                     Sys.setenv(R_LIBS = libdir)
                 }
-                
-                # Tangle all vignettes now.  We'll try again at INSTALL time in 3.0.0,
-                # but eventually this is the only place the tangling will happen.
-                
+
+                # Tangle all vignettes now.
+
                 cmd <- file.path(R.home("bin"), "Rscript")
                 args <- c("--vanilla",
                           "--default-packages=", # some vignettes assume methods
@@ -359,7 +271,7 @@ get_exclude_patterns <- function()
                 Sys.setenv(PATH = oPATH)
                 if (res$status) {
                     resultLog(Log, "ERROR")
-                    printLog(Log, paste(c(res$stdout, ""),  collapse = "\n"))
+                    printLog0(Log, paste(c(res$stdout, ""),  collapse = "\n"))
                     do_exit(1L)
                 } else {
                     # Rescan for weave and tangle output files
@@ -385,11 +297,48 @@ get_exclude_patterns <- function()
                             inst <- rep(FALSE, length(allfiles))
                             for (e in extras)
                                 inst <- inst | grepl(e, allfiles, perl = TRUE,
-                                                     ignore.case = WINDOWS)
+                                                     ignore.case = TRUE)
                             file.copy(allfiles[inst], doc_dir, recursive = TRUE)
                         }
                     }
                 }
+
+		vignetteIndex <- .build_vignette_index(vigns)
+
+		if(NROW(vignetteIndex) > 0L) {
+		    ## remove any files with no R code (they will have header comments).
+		    ## if not correctly declared they might not be in the current encoding
+		    sources <- vignetteIndex$R
+		    for(i in seq_along(sources)) {
+			file <- file.path(doc_dir, sources[i])
+			if (!file_test("-f", file)) next
+			bfr <- readLines(file, warn = FALSE)
+			if(all(grepl("(^###|^[[:space:]]*$)", bfr, useBytes = TRUE))) {
+			    unlink(file)
+			    vignetteIndex$R[i] <- ""
+			}
+		    }
+		}
+
+		## Save the list
+		dir.create("build", showWarnings = FALSE)
+		saveRDS(vignetteIndex,
+			file = file.path("build", "vignette.rds"))
+            }
+        } else {
+            fv <- file.path("build", "vignette.rds")
+            if(file.exists(fv)) {
+                checkingLog(Log, "vignette meta-information")
+                db <- readRDS(fv)
+                pdfs <- file.path("inst", "doc", db[nzchar(db$PDF), ]$PDF)
+                missing <- !file.exists(pdfs)
+                if(any(missing)) {
+                    msg <- c("Output(s) listed in 'build/vignette.rds' but not in package:",
+                             strwrap(sQuote(pdfs[missing]), indent = 2L, exdent = 2L),
+                             "Run R CMD build without --no-build-vignettes to re-create")
+                    errorLog(Log, paste(msg, collapse = "\n"))
+                    do_exit(1L)
+                } else resultLog(Log, "OK")
             }
         }
         if (compact_vignettes != "no" &&
@@ -397,7 +346,7 @@ get_exclude_patterns <- function()
                                full.names = TRUE))) {
             messageLog(Log, "compacting vignettes and other PDF files")
             if(compact_vignettes %in% c("gs", "gs+qpdf", "both")) {
-                gs_cmd <- find_gs_cmd(Sys.getenv("R_GSCMD", ""))
+                gs_cmd <- find_gs_cmd()
                 gs_quality <- "ebook"
             } else {
                 gs_cmd <- ""
@@ -410,7 +359,7 @@ get_exclude_patterns <- function()
                               gs_cmd = gs_cmd, gs_quality = gs_quality)
             res <- format(res, diff = 1e5)
             if(length(res))
-                printLog(Log, paste(" ", format(res), collapse = "\n"), "\n")
+                printLog0(Log, paste(" ", format(res), collapse = "\n"), "\n")
         }
         if (pkgInstalled) {
             unlink(libdir, recursive = TRUE)
@@ -545,7 +494,7 @@ get_exclude_patterns <- function()
 
     	# Strip the pkgdir off the names
     	names(db) <- substring(names(db),
-                               nchar(file.path(pkgdir, "man", "")) + 1L)
+                               nchar(file.path(pkgdir, "man")) + 2L)
 
 	containsSexprs <-
             which(sapply(db, function(Rd) getDynamicFlags(Rd)["\\Sexpr"]))
@@ -807,7 +756,7 @@ get_exclude_patterns <- function()
                 R.version[["major"]], ".",  R.version[["minor"]],
                 " (r", R.version[["svn rev"]], ")\n", sep = "")
             cat("",
-                "Copyright (C) 1997-2011 The R Core Team.",
+                "Copyright (C) 1997-2013 The R Core Team.",
                 "This is free software; see the GNU General Public License version 2",
                 "or later for copying conditions.  There is NO warranty.",
                 sep = "\n")
@@ -819,7 +768,8 @@ get_exclude_patterns <- function()
         } else if (a == "--no-build-vignettes") {
             vignettes <- FALSE
         } else if (a == "--no-vignettes") { # pre-3.0.0 version
-            vignettes <- FALSE
+            stop("'--no-vignettes' is defunct:\n  use '--no-build-vignettes' instead",
+                 call. = FALSE, domain = NA)
         } else if (a == "--resave-data") {
             resave_data <- "best"
         } else if (a == "--no-resave-data") {
@@ -870,8 +820,8 @@ get_exclude_patterns <- function()
         ## This does not easily work if $pkg is a symbolic link.
         ## Hence, we now convert to absolute paths.'
         setwd(startdir)
-        res <- try(setwd(pkg), silent = TRUE)
-        if (inherits(res, "try-error")) {
+	res <- tryCatch(setwd(pkg), error = function(e)e)
+	if (inherits(res, "error")) {
             errorLog(Log, "cannot change to directory ", sQuote(pkg))
             do_exit(1L)
         }
@@ -947,7 +897,7 @@ get_exclude_patterns <- function()
             ignore <- c(ignore, readLines(ignore_file, warn = FALSE))
         for(e in ignore[nzchar(ignore)])
             exclude <- exclude | grepl(e, allfiles, perl = TRUE,
-                                       ignore.case = WINDOWS)
+                                       ignore.case = TRUE)
 
         isdir <- file_test("-d", allfiles)
         ## old (pre-2.10.0) dirnames
@@ -979,7 +929,7 @@ get_exclude_patterns <- function()
         setwd(Tdir)
         ## Fix permissions for all files to be at least 644, and dirs 755
         ## Not restricted by umask.
-        if (!WINDOWS) .Call(dirchmod, pkgname)
+	if (!WINDOWS) .Call(dirchmod, pkgname, group.writable=FALSE)
         ## Add build stamp to the DESCRIPTION file.
         add_build_stamp_to_description_file(file.path(pkgname,
                                                       "DESCRIPTION"))
@@ -1042,11 +992,12 @@ get_exclude_patterns <- function()
         ## Finalize
         filename <- paste0(pkgname, "_", desc["Version"], ".tar.gz")
         filepath <- file.path(startdir, filename)
-        ## NB: naughty reg-packages.R relies on this exact format!
+        ## NB: tests/reg-packages.R relies on this exact format!
         messageLog(Log, "building ", sQuote(filename))
         res <- utils::tar(filepath, pkgname, compression = "gzip",
                           compression_level = 9L,
-                          tar = Sys.getenv("R_BUILD_TAR"))
+                          tar = Sys.getenv("R_BUILD_TAR"),
+                          extra_flags = NULL) # use trapdoor
         if (res) {
             errorLog(Log, "packaging into .tar.gz failed")
             do_exit(1L)

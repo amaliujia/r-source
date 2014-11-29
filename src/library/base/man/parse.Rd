@@ -1,6 +1,6 @@
 % File src/library/base/man/parse.Rd
 % Part of the R package, http://www.R-project.org
-% Copyright 1995-2011 R Core Team
+% Copyright 1995-2013 R Core Team
 % Distributed under GPL 2 or later
 
 \name{parse}
@@ -68,9 +68,6 @@ parse(file = "", n = NULL, text = NULL, prompt = "?",
   or CR (as used on classic Mac OS).  The final line can be incomplete,
   that is missing the final EOL marker.
 
-  See \code{\link{source}} for the limits on the size of functions
-  that can be parsed (by default).
-
   When input is taken from the console, \code{n = NULL} is equivalent to
   \code{n = 1}, and \code{n < 0} will read until an EOF character is
   read.  (The EOF character is Ctrl-Z for the Windows front-ends.)  The
@@ -90,6 +87,18 @@ parse(file = "", n = NULL, text = NULL, prompt = "?",
   include the name, but source reference information will not be added
   to the result.  When \code{srcfile} is a \code{\link{srcfile}}
   object, source reference information will be retained. 
+}
+\section{Partial parsing}{
+  When a syntax error occurs during parsing, \code{parse} 
+  signals an error.  The partial parse data will be stored in the
+  \code{srcfile} argument if it is a \code{\link{srcfile}} object
+  and the \code{text} argument was used to supply the text.  In other
+  cases it will be lost when the error is triggered.
+  
+  The partial parse data can be retrieved using
+  \code{\link{getParseData}} applied to the \code{srcfile} object.
+  Because parsing was incomplete, it will typically include references
+  to \code{"parent"} entries that are not present.  
 }
 \value{
   An object of type \code{"\link{expression}"}, with up to \code{n}
@@ -118,6 +127,15 @@ cat("x <- c(1, 4)\n  x ^ 3 -10 ; outer(1:7, 5:9)\n", file = "xyz.Rdmped")
 # parse 3 statements from the file "xyz.Rdmped"
 parse(file = "xyz.Rdmped", n = 3)
 unlink("xyz.Rdmped")
+
+# A partial parse with a syntax error
+txt <- "
+x <- 1
+an error
+"
+sf <- srcfile("txt")
+try(parse(text = txt, srcfile = sf))
+getParseData(sf)
 }
 \keyword{file}
 \keyword{programming}

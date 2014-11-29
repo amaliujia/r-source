@@ -1,7 +1,7 @@
 #  File src/library/tools/R/Sweavetools.R
 #  Part of the R package, http://www.R-project.org
 #
-#  Copyright (C) 1995-2012 The R Core Team
+#  Copyright (C) 1995-2013 The R Core Team
 #
 #  This program is free software; you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
@@ -17,18 +17,23 @@
 #  http://www.r-project.org/Licenses/
 
 
-SweaveTeXFilter <- function(ifile, encoding = "unknown")
+SweaveTeXFilter <-
+function(ifile, encoding = "unknown")
 {
     if(inherits(ifile, "srcfile"))
         ifile <- ifile$filename
 
     lines <- readLines(ifile, encoding = encoding, warn = FALSE)
 
+    syntax <- utils:::SweaveGetSyntax(ifile)
+
     TEXT <- 1L
     CODE <- 0L
 
-    recs <- rbind( data.frame(line=grep("^@", lines), type=TEXT),
-                   data.frame(line=grep("^<<(.*)>>=.*", lines), type=CODE))
+    recs <- rbind( data.frame(line = grep(syntax$doc, lines),
+                              type = TEXT),
+                   data.frame(line = grep(syntax$code, lines),
+                              type = CODE))
     recs <- recs[order(recs$line),]
     last <- 0L
     state <- TEXT

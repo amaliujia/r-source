@@ -1,7 +1,7 @@
 #  File src/library/base/R/unix/system.unix.R
 #  Part of the R package, http://www.R-project.org
 #
-#  Copyright (C) 1995-2012 The R Core Team
+#  Copyright (C) 1995-2013 The R Core Team
 #
 #  This program is free software; you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
@@ -44,7 +44,7 @@ system <- function(command, intern = FALSE,
         on.exit(unlink(f))
         writeLines(input, f)
         # cat(input, file=f, sep="\n")
-        command <- paste(command, "<", f)
+        command <- paste(command, "<", shQuote(f))
     }
     if(!wait && !intern) command <- paste(command, "&")
     .Internal(system(command, intern))
@@ -98,7 +98,7 @@ system2 <- function(command, args = character(),
         on.exit(unlink(f))
         writeLines(input, f)
         # cat(input, file=f, sep="\n")
-        command <- paste(command, "<", f)
+        command <- paste(command, "<", shQuote(f))
     } else if (nzchar(stdin)) command <- paste(command, "<", stdin)
     if(!wait && !intern) command <- paste(command, "&")
     .Internal(system(command, intern))

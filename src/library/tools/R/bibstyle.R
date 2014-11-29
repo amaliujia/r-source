@@ -1,7 +1,7 @@
 #  File src/library/tools/R/bibstyle.R
 #  Part of the R package, http://www.R-project.org
 #
-#  Copyright (C) 1995-2012 The R Core Team
+#  Copyright (C) 1995-2013 The R Core Team
 #
 #  This program is free software; you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
@@ -21,8 +21,8 @@
 # Clean up LaTeX accents and braces
 cleanupLatex <- function(x) {
     if (!length(x)) return(x)
-    latex <- try(parseLatex(x), silent=TRUE)
-    if (inherits(latex, "try-error")) {
+    latex <- tryCatch(parseLatex(x), error = function(e)e)
+    if (inherits(latex, "error")) {
     	x
     } else {
     	deparseLatex(latexToUtf8(latex), dropBraces=TRUE)

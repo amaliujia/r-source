@@ -1,12 +1,12 @@
 % File src/library/stats/man/predict.lm.Rd
 % Part of the R package, http://www.R-project.org
-% Copyright 1995-2013 R Core Team
+% Copyright 1995-2014 R Core Team
 % Distributed under GPL 2 or later
 
 \name{predict.lm}
 \title{Predict method for Linear Model Fits}
 \alias{predict.lm}
-\alias{predict.mlm}
+%\alias{predict.mlm}
 \concept{regression}
 \description{
   Predicted values based on linear model object.
@@ -23,10 +23,10 @@
   \item{newdata}{An optional data frame in which to look for variables with
     which to predict.  If omitted, the fitted values are used.}
   \item{se.fit}{A switch indicating if standard errors are required.}
-  \item{scale}{Scale parameter for std.err. calculation}
-  \item{df}{Degrees of freedom for scale}
+  \item{scale}{Scale parameter for std.err. calculation.}
+  \item{df}{Degrees of freedom for scale.}
   \item{interval}{Type of interval calculation.}
-  \item{level}{Tolerance/confidence level}
+  \item{level}{Tolerance/confidence level.}
   \item{type}{Type of prediction (response or model term).}
   \item{terms}{If \code{type = "terms"}, which terms (default is all
     terms), a \code{\link{character}} vector.}
@@ -36,7 +36,7 @@
     for prediction intervals.  See \sQuote{Details}.}
   \item{weights}{variance weights for prediction. This can be a numeric
     vector or a one-sided model formula. In the latter case, it is
-    interpreted as an expression evaluated in \code{newdata}}
+    interpreted as an expression evaluated in \code{newdata}.}
   \item{\dots}{further arguments passed to or from other methods.}
 }
 \details{
@@ -111,7 +111,8 @@
 \seealso{
   The model fitting function \code{\link{lm}}, \code{\link{predict}}.
 
-  \link{SafePrediction} for prediction from polynomial and spline fits.
+  \link{SafePrediction} for prediction from (univariable) polynomial and
+  spline fits.
 }
 \examples{
 require(graphics)
@@ -139,12 +140,11 @@ predict(wfit, new, interval = "prediction", weights = (new$x)^2)
 predict(wfit, new, interval = "prediction", weights = ~x^2)
 
 ##-- From  aov(.) example ---- predict(.. terms)
-utils::data(npk, package = "MASS")
 npk.aov <- aov(yield ~ block + N*P*K, npk)
 (termL <- attr(terms(npk.aov), "term.labels"))
 (pt <- predict(npk.aov, type = "terms"))
 pt. <- predict(npk.aov, type = "terms", terms = termL[1:4])
 stopifnot(all.equal(pt[,1:4], pt.,
-                    check.attr = FALSE, tol = 1e-12))
+                    tolerance = 1e-12, check.attributes = FALSE))
 }
 \keyword{regression}

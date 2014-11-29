@@ -1,7 +1,7 @@
 #  File src/library/tools/R/Rdtools.R
 #  Part of the R package, http://www.R-project.org
 #
-#  Copyright (C) 1995-2012 The R Core Team
+#  Copyright (C) 1995-2013 The R Core Team
 #
 #  This program is free software; you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
@@ -34,7 +34,7 @@ function(ifile, encoding = "unknown", keepSpacing = TRUE,
     tags <- RdTags(p)
 
     if ("\\encoding" %in% tags) {
-	encoding <- p[[which(tags == "\\encoding")[1L]]][[1L]]
+	encoding <- p[[which.max(tags == "\\encoding")]][[1L]]
 	if (encoding %in% c("UTF-8", "utf-8", "utf8")) encoding <- "UTF-8"
 	if (!inherits(ifile, "Rd"))
 	    p <- parse_Rd(ifile, encoding=encoding)

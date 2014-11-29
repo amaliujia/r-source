@@ -1,7 +1,9 @@
 % File src/library/tools/man/texi2dvi.Rd
 % Part of the R package, http://www.R-project.org
-% Copyright 1995-2011 R Core Team
+% Copyright 1995-2014 R Core Team
 % Distributed under GPL 2 or later
+
+\newcommand{\sspace}{\ifelse{latex}{\out{~}}{ }}
 
 \name{texi2dvi}
 \alias{texi2dvi}
@@ -9,7 +11,7 @@
 \title{Compile LaTeX Files}
 \description{
   Run \code{latex} and \code{bibtex} until all cross-references are
-  resolved and create either a dvi or PDF file.
+  resolved and create either a dvi or a PDF file.
 }
 \usage{
 texi2dvi(file, pdf = FALSE, clean = FALSE, quiet = TRUE,
@@ -24,15 +26,14 @@ texi2pdf(file, clean = FALSE, quiet = TRUE,
   \item{file}{character.  Name of LaTeX source file.}
   \item{pdf}{logical.  If \code{TRUE}, a PDF file is produced instead of
     the default dvi file (\code{texi2dvi} command line option \option{--pdf}).}
-  \item{clean}{logical.  If \code{TRUE}, all auxiliary files are removed
-    (\code{texi2dvi} command line option \option{--clean}).  May not work on
-    some platforms.}
+  \item{clean}{logical.  If \code{TRUE}, all auxiliary files created
+    during the conversion are removed.}
   \item{quiet}{logical.  No output unless an error occurs.  Ignored if
     emulation (see the \code{texi2dvi} argument) is used.}
   \item{texi2dvi}{character (or \code{NULL}).  Script or program used to
     compile a TeX file to dvi or PDF, respectively.
     The default (selected by \code{""} or \code{NULL}) is to look for an
-    executable on the search path and otherwise emulate the script with
+    executable on the path and otherwise emulate the script with
     \code{system} calls.}
   \item{texinputs}{\code{NULL} or a character vector of paths to add to
     the LaTeX and bibtex input search paths.}
@@ -46,7 +47,7 @@ texi2pdf(file, clean = FALSE, quiet = TRUE,
   specifically those generated from vignettes.  It
   ensures that the \file{\var{\link{R_HOME}}/share/texmf} directory is
   in the \env{TEXINPUTS} path, so \R style files such as \file{Sweave}
-  and \file{Rd} will be found.  The search path used is first the
+  and \file{Rd} will be found.  The TeX search path used is first the
   existing \env{TEXINPUTS} setting (or the current directory if unset),
   then elements of \code{texinputs}, then
   \file{\var{R_HOME}/share/texmf} and finally the default
@@ -54,8 +55,8 @@ texi2pdf(file, clean = FALSE, quiet = TRUE,
   \env{BSTINPUTS} settings.
 
   MiKTeX has a \code{texi2dvi} executable but no other Windows TeX
-  installation that we know of does, so emulation is used on e.g. TeXLive
-  installations on Windows.
+  installation that we know of does, so emulation is used on
+  e.g.\sspace{}TeXLive installations on Windows.
 
   Occasionally indices contain special characters which cause indexing
   to fail (particularly when using the \samp{hyperref} LaTeX package)
@@ -67,14 +68,18 @@ texi2pdf(file, clean = FALSE, quiet = TRUE,
   Unix-alikes and quite a number of bugs have been seen, some of which
   this \R wrapper works around.
 
-  One that is current is that it may not work correctly for paths which
-  contain spaces, nor even if the absolute path to a file would contain
+  One that was present with \command{texi2dvi} version \code{4.8} (as
+  supplied on OS X) is that it will not work correctly for paths which
+  contain spaces, nor if the absolute path to a file would contain
   spaces.
 
   The three possible approaches all have their quirks.  For example the
   Unix-alike \code{texi2dvi} script removes ancillary files that already
   exist but the other two approaches do not (and may get confused by
   such files).
+  
+  Where supported (\command{texi2dvi} 5.x and \command{texify}),
+  option \option{--max-iterations=20} is used to avoid infinite retries.
 }
 \value{
   Invisible \code{NULL}.  Used for the side effect of creating a dvi or

@@ -1,6 +1,6 @@
 % File src/library/base/man/capabilities.Rd
 % Part of the R package, http://www.R-project.org
-% Copyright 1995-2013 R Core Team
+% Copyright 1995-2014 R Core Team
 % Distributed under GPL 2 or later
 
 \name{capabilities}
@@ -66,11 +66,12 @@ capabilities(what = NULL)
 #ifdef unix
       It will be true for the command-line interface if \code{readline}
       support has been compiled in and \option{--no-readline} was
-      \emph{not} used when \R was invoked.
+      \emph{not} used when \R was invoked.  (If \option{--interactive}
+      was used, command-line editing will not actually be available.)
 #endif
       }
     \item{iconv}{is internationalization conversion via
-      \code{\link{iconv}} supported?  Always true as from \R 2.10.0.}
+      \code{\link{iconv}} supported?  Always true in current \R.}
     \item{NLS}{is there Natural Language Support (for message translations)?}
     \item{profmem}{is there support for memory profiling?  See
       \code{\link{tracemem}}.}
@@ -82,6 +83,8 @@ capabilities(what = NULL)
 #endif
       \code{\link{bmp}}, \code{\link{jpeg}}, \code{\link{png}},
       and \code{\link{tiff}} devices?}
+    \item{ICU}{is ICU used for collation?  See \link{Comparison} and
+      \code{\link{icuSetCollate}}.},
 }
 \seealso{\code{\link{.Platform}}}
 

@@ -1,7 +1,9 @@
 % File src/library/grDevices/man/palette.Rd
 % Part of the R package, http://www.R-project.org
-% Copyright 1995-2012 R Core Team
+% Copyright 1995-2013 R Core Team
 % Distributed under GPL 2 or later
+
+\newcommand{\sspace}{\ifelse{latex}{\out{~}}{ }}
 
 \name{palette}
 \title{Set or View the Graphics Palette}
@@ -18,7 +20,7 @@ palette(value)
 }
 \details{
   The color palette and referring to colors by number (see
-  e.g. \code{\link{par}}) was provided for compatibility with S: in \R
+  e.g.\sspace{}\code{\link{par}}) was provided for compatibility with S: in \R
   it is almost always better to specify colours by name.
 
   If \code{value} has length 1, it is taken to be the name of a built-in

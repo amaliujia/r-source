@@ -1,7 +1,7 @@
 /*
  *  R : A Computer Language for Statistical Data Analysis
  *  Copyright (C) 1995, 1996  Robert Gentleman and Ross Ihaka
- *  Copyright (C) 1998-2012   The R Core Team
+ *  Copyright (C) 1998-2013   The R Core Team
  *  Copyright (C) 2002-2008   The R Foundation
  *
  *  This program is free software; you can redistribute it and/or modify
@@ -111,10 +111,20 @@ SEXP attribute_hidden do_matrix(SEXP call, SEXP op, SEXP args, SEXP rho)
 	nr = (int) lendat;
     } else if (miss_nr) {
 	if (lendat > (double) nc * INT_MAX) error("data is too long");
-	nr = (int) ceil((double) lendat / (double) nc);
+	// avoid division by zero
+	if (nc == 0) {
+	    if (lendat) error(_("nc = 0 for non-null data"));
+	    else nr = 0;
+	} else
+	    nr = (int) ceil((double) lendat / (double) nc);
     } else if (miss_nc) {
 	if (lendat > (double) nr * INT_MAX) error("data is too long");
-	nc = (int) ceil((double) lendat / (double) nr);
+	// avoid division by zero
+	if (nr == 0) {
+	    if (lendat) error(_("nr = 0 for non-null data"));
+	    else nc = 0;
+	} else
+	    nc = (int) ceil((double) lendat / (double) nr);
     }
 
     if(lendat > 0) {
@@ -391,7 +401,7 @@ SEXP attribute_hidden do_drop(SEXP call, SEXP op, SEXP args, SEXP rho)
 	for (i = 0; i < n; i++)
 	    if (INTEGER(xdims)[i] == 1) shorten = 1;
 	if (shorten) {
-	    if (NAMED(x)) x = duplicate(x);
+	    if (MAYBE_REFERENCED(x)) x = duplicate(x);
 	    x = DropDims(x);
 	}
     }
@@ -1246,8 +1256,8 @@ SEXP attribute_hidden do_colsum(SEXP call, SEXP op, SEXP args, SEXP rho)
 
     checkArity(op, args);
     x = CAR(args); args = CDR(args);
-    int n = asInteger(CAR(args)); args = CDR(args);
-    int p = asInteger(CAR(args)); args = CDR(args);
+    R_xlen_t n = asVecSize(CAR(args)); args = CDR(args);
+    R_xlen_t p = asVecSize(CAR(args)); args = CDR(args);
     NaRm = asLogical(CAR(args));
     if (n == NA_INTEGER || n < 0)
 	error(_("invalid '%s' argument"), "n");
@@ -1267,7 +1277,7 @@ SEXP attribute_hidden do_colsum(SEXP call, SEXP op, SEXP args, SEXP rho)
 
     if (OP == 0 || OP == 1) { /* columns */
 	PROTECT(ans = allocVector(REALSXP, p));
-#ifdef HAVE_OPENMP
+#ifdef _OPENMP
 	int nthreads;
 	/* This gives a spurious -Wunused-but-set-variable error */
 	if (R_num_math_threads > 0)
@@ -1277,8 +1287,8 @@ SEXP attribute_hidden do_colsum(SEXP call, SEXP op, SEXP args, SEXP rho)
 #pragma omp parallel for num_threads(nthreads) default(none) \
     firstprivate(x, ans, n, p, type, NaRm, keepNA, R_NaReal, R_NaInt, OP)
 #endif
-	for (int j = 0; j < p; j++) {
-	    int cnt = n, i;
+	for (R_xlen_t j = 0; j < p; j++) {
+	    R_xlen_t  cnt = n, i;
 	    LDOUBLE sum = 0.0;
 	    switch (type) {
 	    case REALSXP:
@@ -1328,16 +1338,16 @@ SEXP attribute_hidden do_colsum(SEXP call, SEXP op, SEXP args, SEXP rho)
 	} else rans = Calloc(n, LDOUBLE);
 	if (!keepNA && OP == 3) Cnt = Calloc(n, int);
 
-	for (int j = 0; j < p; j++) {
+	for (R_xlen_t j = 0; j < p; j++) {
 	    LDOUBLE *ra = rans;
 	    switch (type) {
 	    case REALSXP:
 	    {
 		double *rx = REAL(x) + (R_xlen_t)n * j;
 		if (keepNA)
-		    for (int i = 0; i < n; i++) *ra++ += *rx++;
+		    for (R_xlen_t i = 0; i < n; i++) *ra++ += *rx++;
 		else
-		    for (int i = 0; i < n; i++, ra++, rx++)
+		    for (R_xlen_t i = 0; i < n; i++, ra++, rx++)
 			if (!ISNAN(*rx)) {
 			    *ra += *rx;
 			    if (OP == 3) Cnt[i]++;
@@ -1347,7 +1357,7 @@ SEXP attribute_hidden do_colsum(SEXP call, SEXP op, SEXP args, SEXP rho)
 	    case INTSXP:
 	    {
 		int *ix = INTEGER(x) + (R_xlen_t)n * j;
-		for (int i = 0; i < n; i++, ra++, ix++)
+		for (R_xlen_t i = 0; i < n; i++, ra++, ix++)
 		    if (keepNA) {
 			if (*ix != NA_INTEGER) *ra += *ix;
 			else *ra = NA_REAL;
@@ -1361,7 +1371,7 @@ SEXP attribute_hidden do_colsum(SEXP call, SEXP op, SEXP args, SEXP rho)
 	    case LGLSXP:
 	    {
 		int *ix = LOGICAL(x) + (R_xlen_t)n * j;
-		for (int i = 0; i < n; i++, ra++, ix++)
+		for (R_xlen_t i = 0; i < n; i++, ra++, ix++)
 		    if (keepNA) {
 			if (*ix != NA_LOGICAL) *ra += *ix;
 			else *ra = NA_REAL;
@@ -1376,11 +1386,11 @@ SEXP attribute_hidden do_colsum(SEXP call, SEXP op, SEXP args, SEXP rho)
 	}
 	if (OP == 3) {
 	    if (keepNA)
-		for (int i = 0; i < n; i++) rans[i] /= p;
+		for (R_xlen_t i = 0; i < n; i++) rans[i] /= p;
 	    else
-		for (int i = 0; i < n; i++) rans[i] /= Cnt[i];
+		for (R_xlen_t i = 0; i < n; i++) rans[i] /= Cnt[i];
 	}
-	for (int i = 0; i < n; i++) REAL(ans)[i] = (double) rans[i];
+	for (R_xlen_t i = 0; i < n; i++) REAL(ans)[i] = (double) rans[i];
 
 	if (!keepNA && OP == 3) Free(Cnt);
 	if(n > 10000) Free(rans);
@@ -1491,9 +1501,24 @@ SEXP attribute_hidden do_array(SEXP call, SEXP op, SEXP args, SEXP rho)
 	break;
     case VECSXP:
     case EXPRSXP:
+#ifdef SWITCH_TO_REFCNT
 	if (nans && lendat)
 	    for (i = 0; i < nans; i++)
 		SET_VECTOR_ELT(ans, i, VECTOR_ELT(vals, i % lendat));
+#else
+	if (nans && lendat) {
+	    /* Need to guard against possible sharing of values under
+	       NAMED.  This is not needed with reference
+	       coutning. (PR#15919) */
+	    Rboolean needsmark = (lendat < nans || MAYBE_REFERENCED(vals));
+	    for (i = 0; i < nans; i++) {
+		SEXP elt = VECTOR_ELT(vals, i % lendat);
+		if (needsmark || MAYBE_REFERENCED(elt))
+		    MARK_NOT_MUTABLE(elt);
+		SET_VECTOR_ELT(ans, i, elt);
+	    }
+	}
+#endif
 	break;
     default:
 	// excluded above

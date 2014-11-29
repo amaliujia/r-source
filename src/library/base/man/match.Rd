@@ -1,6 +1,6 @@
 % File src/library/base/man/match.Rd
 % Part of the R package, http://www.R-project.org
-% Copyright 1995-2011 R Core Team
+% Copyright 1995-2014 R Core Team
 % Distributed under GPL 2 or later
 
 \name{match}
@@ -69,7 +69,7 @@ x \%in\% table
   useful in \code{if} conditions.
 
   Character strings will be compared as byte sequences if any input is
-  marked as \code{"bytes"}.
+  marked as \code{"bytes"} (see \code{\link{Encoding}}).
 }
 \references{
   Becker, R. A., Chambers, J. M. and Wilks, A. R. (1988)
@@ -98,6 +98,9 @@ sstr[sstr \%in\% c(letters, LETTERS)]
 
 "\%w/o\%" <- function(x, y) x[!x \%in\% y] #--  x without y
 (1:10) \%w/o\% c(3,7,12)
+## Note that setdiff() is very similar and typically makes more sense: 
+        c(1:6,7:2) \%w/o\% c(3,7,12)  # -> keeps duplicates
+setdiff(c(1:6,7:2),        c(3,7,12)) # -> unique values
 }
 \keyword{manip}
 \keyword{logic}

@@ -1,6 +1,6 @@
 % File src/library/base/man/formatc.Rd
 % Part of the R package, http://www.R-project.org
-% Copyright 1995-2012 R Core Team
+% Copyright 1995-2014 R Core Team
 % Distributed under GPL 2 or later
 
 \name{formatC}
@@ -29,7 +29,7 @@ prettyNum(x, big.mark = "",   big.interval = 3L,
 \arguments{
   \item{x}{an atomic numerical or character object, possibly
     \code{\link{complex}} only for \code{prettyNum()}, typically a
-    vector of real numbers.}
+    vector of real numbers.  Any class is discarded, with a warning.}
 
   \item{digits}{the desired number of digits after the decimal
     point (\code{format = "f"}) or \emph{significant} digits
@@ -111,8 +111,9 @@ prettyNum(x, big.mark = "",   big.interval = 3L,
   \item{\dots}{arguments passed to \code{format}.}
 }
 \value{
-  A character object of same size and attributes as \code{x}, in the
-  current locale's encoding.
+  A character object of same size and attributes as \code{x} (after
+  discarding any class), in the current locale's encoding.
+  
   Unlike \code{\link{format}}, each number is formatted individually.
   Looping over each element of \code{x}, the C function
   \code{sprintf(\dots)} is called for numeric inputs (inside the C
@@ -146,8 +147,16 @@ prettyNum(x, big.mark = "",   big.interval = 3L,
   and \code{small.mark}, special characters need escaping.  In particular,
   to insert a single backslash, use \code{"\\\\\\\\"}.
 
-  In versions of \R before 2.13.0, the \code{big.mark} would be
-  reversed on insertion if it contained more than one character.
+  The C doubles used for \R numerical vectors have signed zeros, which
+  \code{formatC} may output as \code{-0}, \code{-0.000} \dots.
+}
+\note{
+  Prior to \R 3.0.2 this copied the class of \code{x} to the return
+  value and could easily create invalid objects.
+  
+  The default for \code{decimal.mark} is not appropriate for use within
+  \code{\link{print}} methods: use \code{decimal.mark =
+    getOption("OutDec")} there.
 }
 \author{
   \code{formatC} was originally written by Bill Dunlap for S-PLUS, later

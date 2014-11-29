@@ -3,7 +3,7 @@
  *  file console.c
  *  Copyright (C) 1998--2003  Guido Masarotto and Brian Ripley
  *  Copyright (C) 2004-8      The R Foundation
- *  Copyright (C) 2004-13     The R Core Team
+ *  Copyright (C) 2004-2013   The R Core Team
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -30,6 +30,7 @@ extern Rboolean mbcslocale;
 
 #define USE_MDI 1
 extern void R_ProcessEvents(void);
+extern void R_WaitEvent(void);
 
 #define WIN32_LEAN_AND_MEAN 1
 #include <windows.h>
@@ -278,18 +279,17 @@ static size_t enctowcs(wchar_t *wc, char *s, int n)
 
 static void xbufadds(xbuf p, const char *s, int user)
 {
-    int n = strlen(s) + 1; /* UCS-2 must be shorter */
+    int n = strlen(s) + 1; /* UCS-2 must be no more chars */
     if (n < 1000) {
 	wchar_t tmp[n];
 	enctowcs(tmp, (char *) s, n);
 	xbufaddxs(p, tmp, user);
     } else {
 	/* very long line */
-	void *vmax = vmaxget();
-	wchar_t *tmp = (wchar_t*) R_alloc(n, sizeof(wchar_t));
+	wchar_t *tmp = (wchar_t*) malloc(n * sizeof(wchar_t));
 	enctowcs(tmp, (char *) s, n);
 	xbufaddxs(p, tmp, user);
-	vmaxset(vmax);
+	free(tmp);
     }
 }
 
@@ -360,7 +360,6 @@ newconsoledata(font f, int rows, int cols, int bufbytes, int buflines,
     p->clp = NULL;
     p->r = -1;
     p->overwrite = 0;
-    p->lazyupdate = 1;
     p->needredraw = 0;
     p->wipe_completion = 0;
     p->my0 = p->my1 = -1;
@@ -1547,7 +1546,10 @@ int consolewrites(control c, const char *s)
 	xbufaddxs(p->lbuf, buf, 1);
     }
     if (strchr(s, '\n')) p->needredraw = 1;
-    if (!p->lazyupdate || (p->r >= 0))
+    if (!p->lazyupdate) {
+	setfirstvisible(c, NUMLINES - ROWS);
+	REDRAW;
+    } else if (p->r >= 0)
 	setfirstvisible(c, NUMLINES - ROWS);
     else {
 	p->newfv = NUMLINES - ROWS;
@@ -1582,7 +1584,7 @@ static wchar_t consolegetc(control c)
     p = getdata(c);
     while((p->numkeys == 0) && (!p->clp))
     {
-	if (!peekevent()) WaitMessage();
+	R_WaitEvent();
 	R_ProcessEvents();
     }
     if (p->sel) {

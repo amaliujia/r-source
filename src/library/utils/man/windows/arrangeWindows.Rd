@@ -1,6 +1,6 @@
 % File src/library/utils/man/windows/arrangeWindows.Rd
 % Part of the R package, http://www.R-project.org
-% Copyright 2009 Duncan Murdoch and the R Core Team
+% Copyright 2009-2013 Duncan Murdoch and the R Core Team
 % Distributed under GPL 2 or later
 
 \name{arrangeWindows}
@@ -61,6 +61,10 @@ GUI frame. However, if \code{outer = TRUE}, tiling is done on the system
 desktop. This will generally not give desirable results if any R child
 windows are included within \code{windows}.
 
+}
+
+\note{
+  This is only available on Windows.
 }
 
 \value{

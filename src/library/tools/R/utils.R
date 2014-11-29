@@ -1,7 +1,7 @@
 #  File src/library/tools/R/utils.R
 #  Part of the R package, http://www.R-project.org
 #
-#  Copyright (C) 1995-2013 The R Core Team
+#  Copyright (C) 1995-2014 The R Core Team
 #
 #  This program is free software; you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
@@ -57,6 +57,8 @@ function(x, compression = FALSE)
 }
 
 ### ** file_test
+
+## exported/documented copy is in utils.
 
 file_test <-
 function(op, x, y)
@@ -207,17 +209,16 @@ function(file, pdf = FALSE, clean = FALSE, quiet = TRUE,
          texi2dvi = getOption("texi2dvi"),
          texinputs = NULL, index = TRUE)
 {
+    if (clean) pre_files <- list.files(all.files = TRUE)
     do_cleanup <- function(clean)
         if(clean) {
             ## output file will be created in the current directory
             out_file <- paste(basename(file_path_sans_ext(file)),
-                              if(pdf) "pdf" else "dvi",
-                              sep = ".")
+                              if(pdf) "pdf" else "dvi", sep = ".")
             files <- setdiff(list.files(all.files = TRUE),
-                             c(".", "..", out_file))
-            file.remove(files[file_test("-nt", files, ".timestamp")])
+                             c(".", "..", out_file, pre_files))
+            file.remove(files)
         }
-
 
     ## Run texi2dvi on a latex file, or emulate it.
 
@@ -260,11 +261,6 @@ function(file, pdf = FALSE, clean = FALSE, quiet = TRUE,
     } else on.exit(Sys.setenv(BSTINPUTS = obstinputs), add = TRUE)
     Sys.setenv(BSTINPUTS = paste(obstinputs, bstinputs, sep = envSep))
 
-    if (clean) {
-        file.create(".timestamp")
-        on.exit(file.remove(".timestamp"), add = TRUE)
-        Sys.sleep(0.1) # wait long enough for files to be after the timestamp
-    }
     if(index && nzchar(texi2dvi) && .Platform$OS.type != "windows") {
         ## switch off the use of texindy in texi2dvi >= 1.157
         Sys.setenv(TEXINDY = "false")
@@ -275,6 +271,9 @@ function(file, pdf = FALSE, clean = FALSE, quiet = TRUE,
         out <- .system_with_capture(texi2dvi, "--help")
         if(length(grep("--no-line-error", out$stdout)))
             opt_extra <- "--no-line-error"
+        ## This is present in texinfo after late 2009, so really 5.x.
+        if(length(grep("--max-iterations=N", out$stdout)))
+            opt_extra <- c(opt_extra, "--max-iterations=20")
         ## (Maybe change eventually: the current heuristics for finding
         ## error messages in log files should work for both regular and
         ## file line error indicators.)
@@ -283,10 +282,14 @@ function(file, pdf = FALSE, clean = FALSE, quiet = TRUE,
         ## https://stat.ethz.ch/pipermail/r-devel/2011-March/060262.html
         ## That has [A-Za-z], earlier versions [A-z], both of which may be
         ## invalid in some locales.
+        env0 <- "LC_COLLATE=C"
+        ## texi2dvi, at least on OS X (4.8) does not accept TMPDIR with spaces.
+        if (grepl(" ", Sys.getenv("TMPDIR")))
+            env0 <- paste(env0,  "TMPDIR=/tmp")
         out <- .system_with_capture(texi2dvi,
                                     c(opt_pdf, opt_quiet, opt_extra,
                                       shQuote(file)),
-                                    env = "LC_COLLATE=C")
+                                    env = env0)
 
         ## We cannot necessarily rely on out$status, hence let us
         ## analyze the log files in any case.
@@ -352,9 +355,10 @@ function(file, pdf = FALSE, clean = FALSE, quiet = TRUE,
         if(length(grep("MiKTeX", ver[1L]))) {
             ## AFAICS need separate -I for each element of texinputs.
             texinputs <- c(texinputs0, Rtexinputs, Rbstinputs)
-	    texinputs <- gsub("\\", "/", texinputs, fixed = TRUE)
-	    paths <- paste ("-I", shQuote(texinputs))
-            extra <- paste(extra, paste(paths, collapse = " "))
+            texinputs <- gsub("\\", "/", texinputs, fixed = TRUE)
+            paths <- paste ("-I", shQuote(texinputs))
+            extra <- "--max-iterations=20"
+           extra <- paste(extra, paste(paths, collapse = " "))
         }
         ## 'file' could be a file path
         base <- basename(file_path_sans_ext(file))
@@ -440,8 +444,10 @@ function(file, pdf = FALSE, clean = FALSE, quiet = TRUE,
 
 ### ** .BioC_version_associated_with_R_version
 
+..BioC_version_associated_with_R_version <- function()
+    numeric_version(Sys.getenv("R_BIOC_VERSION", "3.0"))
 .BioC_version_associated_with_R_version <-
-    numeric_version("2.12")
+    ..BioC_version_associated_with_R_version()
 ## Things are more complicated from R-2.15.x with still two BioC
 ## releases a year, so we do need to set this manually.
 
@@ -582,11 +588,14 @@ function(file1, file2)
 ### ** .file_path_relative_to_dir
 
 .file_path_relative_to_dir <-
-function(x, dir)
+function(x, dir, add = FALSE)
 {
     if(any(ind <- (substring(x, 1L, nchar(dir)) == dir))) {
         ## Assume .Platform$file.sep is a single character.
-        x[ind] <- substring(x, nchar(dir) + 2L)
+        x[ind] <- if(add)
+            file.path(basename(dir), substring(x[ind], nchar(dir) + 2L))
+        else
+            substring(x[ind], nchar(dir) + 2L)
     }
     x
 }
@@ -596,7 +605,7 @@ function(x, dir)
 .find_calls <-
 function(x, predicate = NULL, recursive = FALSE)
 {
-    x <- as.list(x)
+    x <- if(is.call(x)) list(x) else as.list(x)
 
     f <- if(is.null(predicate))
         function(e) is.call(e)
@@ -789,7 +798,8 @@ function(dir, installed = FALSE)
 
 .get_requires_from_package_db <-
 function(db,
-         category = c("Depends", "Imports", "LinkingTo", "Suggests", "Enhances"))
+         category = c("Depends", "Imports", "LinkingTo", "VignetteBuilder",
+         "Suggests", "Enhances"))
 {
     category <- match.arg(category)
     if(category %in% names(db)) {
@@ -808,7 +818,8 @@ function(db,
 
 .get_requires_with_version_from_package_db <-
 function(db,
-         category = c("Depends", "Imports", "LinkingTo", "Suggests", "Enhances"))
+         category = c("Depends", "Imports", "LinkingTo", "VignetteBuilder",
+         "Suggests", "Enhances"))
 {
     category <- match.arg(category)
     if(category %in% names(db)) {
@@ -1017,6 +1028,7 @@ function()
                "Packaged",
                "Priority",
                "Suggests",
+               "SysDataCompression",
                "SystemRequirements",
                "Title",
                "Type",
@@ -1024,14 +1036,18 @@ function()
                "Version",
                "VignetteBuilder",
                "ZipData"),
+             ## Should be documented in R-exts eventually:
+             c("Additional_repositories"),
              ## Others: adjust as needed.
              c("Repository",
                "Path",
                "Date/Publication",
                "LastChangedDate",
                "LastChangedRevision",
+               "Revision",
                "RcmdrModels",
                "RcppModules",
+               "Roxygen",
                "biocViews")
              ))
 }
@@ -1047,6 +1063,46 @@ function(texi = NULL)
     lines <- readLines(texi)
     re <- "^@c DESCRIPTION field "
     sort(unique(sub(re, "", lines[grepl(re, lines)])))
+}
+
+### ** .gsub_with_transformed_matches
+
+.gsub_with_transformed_matches <-
+function(pattern, replacement, x, trafo, count, ...)
+{
+    ## gsub() with replacements featuring transformations of matches.
+    ##
+    ## Character string (%s) conversion specifications in 'replacement'
+    ## will be replaced by applying the respective transformations in
+    ## 'trafo' to the respective matches (parenthesized subexpressions of
+    ## 'pattern') specified by 'count'.
+    ##
+    ## Argument 'trafo' should be a single unary function, or a list of
+    ## such functions.
+    ## Argument 'count' should be a vector of with the numbers of
+    ## parenthesized subexpressions to be transformed (0 gives the whole
+    ## match).
+
+    replace <- function(yi) {
+        do.call(sprintf,
+                c(list(replacement),
+                  Map(function(tr, co) tr(yi[co]),
+                      trafo, count + 1L)))
+    }
+
+    if(!is.list(trafo)) trafo <- list(trafo)
+    m <- gregexpr(pattern, x, ...)
+    v <- lapply(regmatches(x, m),
+                function(e) {
+                    y <- regmatches(e, regexec(pattern, e, ...))
+                    unlist(Map(function(ei, yi) {
+                        sub(pattern, replace(yi), ei, ...)
+                    },
+                               e,
+                               y))
+                })
+    regmatches(x, m) <- v
+    x
 }
 
 ### ** .is_ASCII
@@ -1070,9 +1126,9 @@ function(x)
     raw_ub <- charToRaw("\x7f")
     raw_lb <- charToRaw("\xa0")
     vapply(as.character(x), function(txt) {
-	    raw <- charToRaw(txt)
-	    all(raw <= raw_ub | raw >= raw_lb)
-	}, NA)
+        raw <- charToRaw(txt)
+        all(raw <= raw_ub | raw >= raw_lb)
+    }, NA)
 }
 
 ### ** .is_primitive_in_base
@@ -1108,13 +1164,13 @@ function(fname, envir, mustMatch = TRUE)
     ## If we use something like: a generic has to be
     ##      function(e) <UME>  # UME = UseMethod Expression
     ## with
-    ##	    <UME> = UseMethod(...) |
+    ##      <UME> = UseMethod(...) |
     ##             if (...) <UME> [else ...] |
     ##             if (...) ... else <UME>
     ##             { ... <UME> ... }
     ## then a recognizer for UME might be as follows.
 
-    f <- get(fname, envir = envir, inherits = FALSE)
+    f <- suppressMessages(get(fname, envir = envir, inherits = FALSE))
     if(!is.function(f)) return(FALSE)
     isUMEbrace <- function(e) {
         for (ee in as.list(e[-1L])) if (nzchar(res <- isUME(ee))) return(res)
@@ -1170,6 +1226,10 @@ function(package, lib.loc)
 }
 
 ### ** .make_file_exts
+
+## <FIXME>
+## Remove support for type "vignette" eventually ...
+## </FIXME>
 
 .make_file_exts <-
 function(type = c("code", "data", "demo", "docs", "vignette"))
@@ -1277,8 +1337,7 @@ function(package)
              Hmisc = c("abs.error.pred", "all.digits", "all.is.numeric",
                        "format.df", "format.pval", "t.test.cluster"),
              HyperbolicDist = "log.hist",
-             MASS = c("frequency.polygon",
-                      "gamma.dispersion", "gamma.shape",
+             MASS = c("frequency.polygon", "gamma.dispersion", "gamma.shape",
                       "hist.FD", "hist.scott"),
              ## FIXME: since these are already listed with 'base',
              ##        they should not need to be repeated here:
@@ -1290,10 +1349,11 @@ function(package)
              SMPracticals = "exp.gibbs",
              XML = "text.SAX",
              ape = "sort.index",
-	     assist = "chol.new",
+             arm = "sigma.hat", # lme4 has sigma()
+             assist = "chol.new",
              boot = "exp.tilt",
              car = "scatterplot.matrix",
-	     calibrator = "t.fun",
+             calibrator = "t.fun",
              clusterfly = "ggobi.som",
              coda = "as.mcmc.list",
              crossdes = "all.combn",
@@ -1304,15 +1364,15 @@ function(package)
              gbm = c("pretty.gbm.tree", "quantile.rug"),
              gpclib = "scale.poly",
              grDevices = "boxplot.stats",
-             graphics = c("close.screen",
-             "plot.design", "plot.new", "plot.window", "plot.xy",
-             "split.screen"),
+             graphics = c("close.screen", "plot.design", "plot.new",
+                          "plot.window", "plot.xy", "split.screen"),
              ic.infer = "all.R2",
              hier.part = "all.regs",
              lasso2 = "qr.rtr.inv",
              latticeExtra = "xyplot.list",
              locfit = c("density.lf", "plot.eval"),
              moments = c("all.cumulants", "all.moments"),
+             mosaic = "t.test",
              mratios = c("t.test.ration", "t.test.ratio.default",
                          "t.test.ratio.formula"),
              ncdf = c("open.ncdf", "close.ncdf",
@@ -1323,15 +1383,17 @@ function(package)
              rgeos = "scale.poly",
              sac = "cumsum.test",
              sm = "print.graph",
+             splusTimeDate = "sort.list",
+             splusTimeSeries = "sort.list",
              stats = c("anova.lmlist", "fitted.values", "lag.plot",
-             "influence.measures", "t.test",
-             "plot.spec.phase", "plot.spec.coherency"),
+                       "influence.measures", "t.test",
+                       "plot.spec.phase", "plot.spec.coherency"),
              supclust = c("sign.change", "sign.flip"),
-	     tensorA = "chol.tensor",
+             tensorA = "chol.tensor",
              utils = c("close.socket", "flush.console", "update.packages")
              )
     if(is.null(package)) return(unlist(stopList))
-    thisPkg <- stopList[[package, exact = TRUE]] # 'st' matched 'stats'
+    thisPkg <- stopList[[package]]
     if(!length(thisPkg)) character() else thisPkg
 }
 
@@ -1430,7 +1492,7 @@ function(dfile)
                                   dfile),
                          domain = NA, call. = FALSE))
     if (nrow(out) != 1)
-    	stop("contains a blank line", call. = FALSE)
+        stop("contains a blank line", call. = FALSE)
     out <- out[1,]
     if(!is.na(encoding <- out["Encoding"])) {
         ## could convert everything to UTF-8
@@ -1469,7 +1531,7 @@ function(x, dfile)
     Encoding(x) <- "unknown"
     ## Avoid folding for fields where we keep whitespace when reading.
     write.dcf(rbind(x), dfile,
-              keep.white = .keep_white_description_fields)
+              keep.white = c(.keep_white_description_fields, "Maintainer"))
 }
 
 ### ** .read_repositories
@@ -1493,7 +1555,7 @@ function(x)
                                     "http://www.bioconductor.org")),
              x, fixed = TRUE)
     sub("%v",
-        as.character(.BioC_version_associated_with_R_version),
+        as.character(..BioC_version_associated_with_R_version()),
         x, fixed = TRUE)
 }
 
@@ -1515,6 +1577,23 @@ function(x)
                 utils:::.format_authors_at_R_field_for_maintainer(aar)
     }
     y
+}
+
+### ** .replace_chars_by_hex_subs
+
+.replace_chars_by_hex_subs <-
+function(x, re) {
+    char_to_hex_sub <- function(s) {
+        paste0("<", charToRaw(s), ">", collapse = "")
+    }
+    vapply(strsplit(x, ""),
+           function(e) {
+               pos <- grep(re, e, perl = TRUE)
+               if(length(pos))
+                   e[pos] <- vapply(e[pos], char_to_hex_sub, "")
+               paste(e, collapse = "")
+           },
+           "")
 }
 
 ### ** .source_assignments
@@ -1611,6 +1690,14 @@ function(x)
 }
 
 ### ** .strip_whitespace
+
+## <NOTE>
+## Other languages have this as strtrim() (or variants for left or right
+## trimming only), but R has a different strtrim().
+## So perhaps strstrip()?
+## Could more generally do
+##   strstrip(x, pattern, which = c("both", "left", "right"))
+## </NOTE>
 
 .strip_whitespace <-
 function(x)

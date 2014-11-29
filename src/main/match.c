@@ -1,7 +1,7 @@
 /*
  *  R : A Computer Langage for Statistical Data Analysis
  *  Copyright (C) 1995, 1996  Robert Gentleman and Ross Ihaka
- *  Copyright (C) 1998-2012   The R Core Team.
+ *  Copyright (C) 1998-2013   The R Core Team.
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -77,6 +77,7 @@ Rboolean psmatch(const char *f, const char *t, Rboolean exact)
 Rboolean pmatch(SEXP formal, SEXP tag, Rboolean exact)
 {
     const char *f, *t;
+    const void *vmax = vmaxget();
     switch (TYPEOF(formal)) {
     case SYMSXP:
 	f = CHAR(PRINTNAME(formal));
@@ -103,7 +104,9 @@ Rboolean pmatch(SEXP formal, SEXP tag, Rboolean exact)
     default:
 	goto fail;
     }
-    return psmatch(f, t, exact);
+    Rboolean res = psmatch(f, t, exact);
+    vmaxset(vmax);
+    return res;
  fail:
     error(_("invalid partial string match"));
     return FALSE;/* for -Wall */
@@ -188,7 +191,10 @@ SEXP attribute_hidden matchArgs(SEXP formals, SEXP supplied, SEXP call)
 
     actuals = R_NilValue;
     for (f = formals ; f != R_NilValue ; f = CDR(f), arg_i++) {
-	actuals = CONS(R_MissingArg, actuals);
+	/* CONS_NR is used since argument lists created here are only
+	   used internally and so should not increment reference
+	   counts */
+	actuals = CONS_NR(R_MissingArg, actuals);
 	SET_MISSING(actuals, 1);
     }
     /* We use fargused instead of ARGUSED/SET_ARGUSED on elements of
@@ -199,7 +205,7 @@ SEXP attribute_hidden matchArgs(SEXP formals, SEXP supplied, SEXP call)
        incorrect "formal argument 'foo' matched by multiple actual
        arguments" error.
      */
-    int fargused[arg_i];
+    int fargused[arg_i ? arg_i : 1]; // avoid undefined behaviour
     memset(fargused, 0, sizeof(fargused));
 
     for(b = supplied; b != R_NilValue; b = CDR(b)) SET_ARGUSED(b, 0);

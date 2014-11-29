@@ -1,7 +1,7 @@
 /*
  *  R : A Computer Language for Statistical Data Analysis
  *  file dounzip.c
- *  first part Copyright (C) 2002-12  The R Core Team
+ *  first part Copyright (C) 2002-2014  The R Core Team
  *  second part Copyright (C) 1998-2010 Gilles Vollant
  *
  *  This program is free software; you can redistribute it and/or modify
@@ -126,6 +126,7 @@ extract_one(unzFile uf, const char *const dest, const char * const filename,
     if (filename) {
 	if (strlen(dest) + strlen(filename) > PATH_MAX - 2) return 1;
 	strncpy(fn0, filename, PATH_MAX); 
+        fn0[PATH_MAX - 1] = '\0';
 	fn = fn0;
     }
 #ifdef Win32
@@ -298,13 +299,15 @@ static SEXP ziplist(const char *zipname)
     return ans;
 }
 
-
+/* called from a .External in package 'utils', so managing
+   the R_alloc stack here is prudence */
 SEXP Runzip(SEXP args)
 {
     SEXP  fn, ans, names = R_NilValue;
     char  zipname[PATH_MAX], dest[PATH_MAX];
     const char *p, **topics = NULL;
     int   i, ntopics, list, overwrite, junk, setTime, rc, nnames = 0;
+    const void *vmax = vmaxget();
 
     if (!isString(CAR(args)) || LENGTH(CAR(args)) != 1)
 	error(_("invalid zip name argument"));
@@ -380,6 +383,7 @@ SEXP Runzip(SEXP args)
     PROTECT(names = lengthgets(names, nnames));
     setAttrib(ans, install("extracted"), names);
     UNPROTECT(3);
+    vmaxset(vmax);
     return ans;
 }
 

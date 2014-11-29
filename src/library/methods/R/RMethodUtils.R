@@ -1,7 +1,7 @@
 #  File src/library/methods/R/RMethodUtils.R
 #  Part of the R package, http://www.R-project.org
 #
-#  Copyright (C) 1995-2012 The R Core Team
+#  Copyright (C) 1995-2013 The R Core Team
 #
 #  This program is free software; you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
@@ -1286,7 +1286,7 @@ metaNameUndo <- function(strings, prefix, searchForm = FALSE)
         vlist[[i]] <- do.call("substitute", list(vlist[[i]], slist))
     dnames <- names(dlist)
     whereNames <- match(old, dnames)
-    if(any(is.na(whereNames)))
+    if(anyNA(whereNames))
 	stop(gettextf("in changing formal arguments in %s, some of the old names are not in fact arguments: %s",
 		      msg, paste0("\"", old[is.na(match(old, names(dlist)))], "\"", collapse=", ")),
 	     domain = NA)

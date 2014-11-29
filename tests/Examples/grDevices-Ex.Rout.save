@@ -1,6 +1,6 @@
 
-R version 3.0.0 RC (2013-03-29 r62438) -- "Masked Marvel"
-Copyright (C) 2013 The R Foundation for Statistical Computing
+R version 3.1.2 RC (2014-10-29 r66897) -- "Pumpkin Helmet"
+Copyright (C) 2014 The R Foundation for Statistical Computing
 Platform: x86_64-unknown-linux-gnu (64-bit)
 
 R is free software and comes with ABSOLUTELY NO WARRANTY.
@@ -115,8 +115,8 @@ $allowed
 +      main = "example(Japanese)", xlab = "using Hershey fonts")
 > par(cex = 3)
 > Vf <- c("serif", "plain")
-> text(4, 2, "\\#J2438\\#J2421\\#J2451\\#J2473", vfont = Vf)
-> text(4, 4, "\\#J2538\\#J2521\\#J2551\\#J2573", vfont = Vf)
+> text(4, 2, "\\#J244b\\#J245b\\#J2473", vfont = Vf)
+> text(4, 4, "\\#J2538\\#J2563\\#J2551\\#J2573", vfont = Vf)
 > text(4, 6, "\\#J467c\\#J4b5c", vfont = Vf)
 > text(4, 8, "Japan", vfont = Vf)
 > par(cex = 1)
@@ -377,7 +377,8 @@ $allowed
 > plot(10*(0:10)); (pu <- par("usr"))
 [1]   0.6  11.4  -4.0 104.0
 > aX <- function(side, at, ...)
-+     axis(side, at = at, labels = FALSE, lwd.ticks = 2, col.ticks = 2, tck = 0.05, ...)
++     axis(side, at = at, labels = FALSE, lwd.ticks = 2, col.ticks = 2,
++          tck = 0.05, ...)
 > aX(1, print(xa <- axisTicks(pu[1:2], log = FALSE)))  # x axis
 [1]  2  4  6  8 10
 > aX(2, print(ya <- axisTicks(pu[3:4], log = FALSE)))  # y axis
@@ -1515,11 +1516,11 @@ List of 150
 [5,]   0.00 255.00    0
 > colorRampPalette(c("blue", "red"))( 4 ) ## (n)
 [1] "#0000FF" "#5500AA" "#AA0055" "#FF0000"
-> ## Don't show: 
-> ## special case, invalid in R <= 2.15.0:
-> bb <- colorRampPalette(2)(4)
-> stopifnot(bb[1] == bb)
-> ## End Don't show
+> ## a ramp in opacity of blue values
+> colorRampPalette(c(rgb(0,0,1,1), rgb(0,0,1,0)), alpha = TRUE)(8)
+[1] "#0000FFFF" "#0000FFDA" "#0000FFB6" "#0000FF91" "#0000FF6D" "#0000FF48"
+[7] "#0000FF24" "#0000FF00"
+> 
 > require(graphics)
 > 
 > ## Here space="rgb" gives palettes that vary only in saturation,
@@ -1845,16 +1846,6 @@ gray    76.97594   0.00000    0.00000
 > 
 > ### ** Examples
 > 
-> x1  <- matrix(rnorm(1e3), ncol = 2)
-> x2  <- matrix(rnorm(1e3, mean = 3, sd = 1.5), ncol = 2)
-> x   <- rbind(x1, x2)
-> 
-> dcols <- densCols(x)
-KernSmooth 2.23 loaded
-Copyright M. P. Wand 1997-2009
-> graphics::plot(x, col = dcols, pch = 20, main = "n = 1000")
-> 
-> 
 > 
 > cleanEx()
 > nameEx("dev")
@@ -2024,10 +2015,69 @@ character(0)
 > 
 > ### ** Examples
 > 
+> # This currently only works on the Windows
+> # and X11(type = "Xlib") screen devices...
+> ## Not run: 
+> ##D savepar <- par(ask = FALSE)
+> ##D dragplot <- function(..., xlim = NULL, ylim = NULL, xaxs = "r", yaxs = "r") {
+> ##D     plot(..., xlim = xlim, ylim = ylim, xaxs = xaxs, yaxs = yaxs)
+> ##D     startx <- NULL
+> ##D     starty <- NULL
+> ##D     prevx <- NULL
+> ##D     prevy <- NULL
+> ##D     usr <- NULL
+> ##D 
+> ##D     devset <- function()
+> ##D         if (dev.cur() != eventEnv$which) dev.set(eventEnv$which)
+> ##D 
+> ##D     dragmousedown <- function(buttons, x, y) {
+> ##D         startx <<- x
+> ##D         starty <<- y
+> ##D         prevx <<- 0
+> ##D         prevy <<- 0
+> ##D         devset()
+> ##D         usr <<- par("usr")
+> ##D         eventEnv$onMouseMove <- dragmousemove
+> ##D         NULL
+> ##D     }
+> ##D 
+> ##D     dragmousemove <- function(buttons, x, y) {
+> ##D         devset()
+> ##D         deltax <- diff(grconvertX(c(startx, x), "ndc", "user"))
+> ##D         deltay <- diff(grconvertY(c(starty, y), "ndc", "user"))
+> ##D 	if (abs(deltax-prevx) + abs(deltay-prevy) > 0) {
+> ##D 	    plot(..., xlim = usr[1:2]-deltax, xaxs = "i",
+> ##D 		      ylim = usr[3:4]-deltay, yaxs = "i")
+> ##D 	    prevx <<- deltax
+> ##D 	    prevy <<- deltay
+> ##D 	}
+> ##D         NULL
+> ##D     }
+> ##D 
+> ##D     mouseup <- function(buttons, x, y) {
+> ##D     	eventEnv$onMouseMove <- NULL
+> ##D     }	
+> ##D 
+> ##D     keydown <- function(key) {
+> ##D         if (key == "q") return(invisible(1))
+> ##D         eventEnv$onMouseMove <- NULL
+> ##D         NULL
+> ##D     }
+> ##D 
+> ##D     setGraphicsEventHandlers(prompt = "Click and drag, hit q to quit",
+> ##D                      onMouseDown = dragmousedown,
+> ##D                      onMouseUp = mouseup,
+> ##D                      onKeybd = keydown)
+> ##D     eventEnv <- getGraphicsEventEnv()
+> ##D }
+> ##D 
+> ##D dragplot(rnorm(1000), rnorm(1000))
+> ##D getGraphicsEvent()
+> ##D par(savepar)
+> ## End(Not run)
 > 
 > 
 > 
-> graphics::par(get("par.postscript", pos = 'CheckExEnv'))
 > cleanEx()
 > nameEx("gray")
 > ### * gray
@@ -2152,7 +2202,7 @@ character(0)
 +               is.numeric(chroma), chroma >= 0, (nch <- length(chroma)) >= 1)
 +     if(is.unsorted(hues)) hues <- sort(hues)
 +     if(nch > 1) {
-+         op <- par(mfrow= n2mfrow(nch), mar = c(0,0,0,0))
++         op <- par(mfrow= n2mfrow(nch), mar = c(0,0,0,0), xpd = TRUE)
 +         on.exit(par(op))
 +     }
 +     for(i.c in 1:nch) {
@@ -2462,31 +2512,9 @@ Sturges   Scott      FD
 > 
 > ### ** Examples
 > 
-> ## Not run: 
-> ##D ## Test function for encodings
-> ##D TestChars <- function(encoding = "ISOLatin1", ...)
-> ##D {
-> ##D     pdf(encoding = encoding, ...)
-> ##D     par(pty = "s")
-> ##D     plot(c(-1,16), c(-1,16), type = "n", xlab = "", ylab = "",
-> ##D          xaxs = "i", yaxs = "i")
-> ##D          title(paste("Centred chars in encoding", encoding))
-> ##D     grid(17, 17, lty = 1)
-> ##D     for(i in c(32:255)) {
-> ##D         x <- i %% 16
-> ##D         y <- i %/% 16
-> ##D         points(x, y, pch = i)
-> ##D     }
-> ##D     dev.off()
-> ##D }
-> ##D ## there will be many warnings.
-> ##D TestChars("ISOLatin2")
-> ##D ## this does not view properly in older viewers.
-> ##D TestChars("ISOLatin2", family = "URWHelvetica")
-> ##D ## works well for viewing in gs-based viewers, and often in xpdf.
-> ## End(Not run)
 > 
 > 
+> graphics::par(get("par.postscript", pos = 'CheckExEnv'))
 > cleanEx()
 > nameEx("pdf.options")
 > ### * pdf.options
@@ -2945,6 +2973,20 @@ $encoding
 attr(,"class")
 [1] "Type1Font"
 
+$ArialMT
+$family
+[1] "ArialMT"
+
+$metrics
+[1] "ArialMT.afm"            "ArialMT-Bold.afm"       "ArialMT-Italic.afm"    
+[4] "ArialMT-BoldItalic.afm" "Symbol.afm"            
+
+$encoding
+[1] "default"
+
+attr(,"class")
+[1] "Type1Font"
+
 $ComputerModern
 $family
 [1] "ComputerModern"
@@ -3150,9 +3192,10 @@ attr(,"class")
 [13] "URWBookman"           "NimbusMon"            "NimbusSan"           
 [16] "URWHelvetica"         "NimbusSanCond"        "CenturySch"          
 [19] "URWPalladio"          "NimbusRom"            "URWTimes"            
-[22] "Japan1"               "Japan1HeiMin"         "Japan1GothicBBB"     
-[25] "Japan1Ryumin"         "Korea1"               "Korea1deb"           
-[28] "CNS1"                 "GB1"                  "Jp_UCS-2"            
+[22] "ArialMT"              "Japan1"               "Japan1HeiMin"        
+[25] "Japan1GothicBBB"      "Japan1Ryumin"         "Korea1"              
+[28] "Korea1deb"            "CNS1"                 "GB1"                 
+[31] "Jp_UCS-2"            
 > 
 > 
 > 
@@ -3455,7 +3498,7 @@ v 0.98039216 0.7647059 0.4588235 0.8549020 0.9960784
 > 
 > ## confirm the equivalence:
 > all.equal(rgb2hsv (rgb3),
-+           rgb2hsvR(rgb3), tol = 1e-14) # TRUE
++           rgb2hsvR(rgb3), tolerance = 1e-14) # TRUE
 [1] TRUE
 > 
 > 
@@ -3705,8 +3748,9 @@ $zlab
 > 
 > ### * <FOOTER>
 > ###
+> options(digits = 7L)
 > base::cat("Time elapsed: ", proc.time() - base::get("ptime", pos = 'CheckExEnv'),"\n")
-Time elapsed:  8.757 0.186 8.972 0 0 
+Time elapsed:  8.097 0.155 8.277 0 0 
 > grDevices::dev.off()
 null device 
           1 

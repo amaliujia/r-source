@@ -1,7 +1,7 @@
 /*
  *  R : A Computer Language for Statistical Data Analysis
  *  Copyright (C) 1995  Robert Gentleman and Ross Ihaka
- *  Copyright (C) 1997--2012  The R Core Team
+ *  Copyright (C) 1997--2013  The R Core Team
  *  Copyright (C) 2003	      The R Foundation
  *
  *  This program is free software; you can redistribute it and/or modify
@@ -231,6 +231,7 @@ resolveNativeRoutine(SEXP args, DL_FUNC *fun,
 
     /* Make up the load symbol */
     if(TYPEOF(op) == STRSXP) {
+	const void *vmax = vmaxget();
 	p = translateChar(STRING_ELT(op, 0));
 	if(strlen(p) >= MaxSymbolBytes)
 	    error(_("symbol '%s' is too long"), p);
@@ -240,6 +241,7 @@ resolveNativeRoutine(SEXP args, DL_FUNC *fun,
 	    p++;
 	    q++;
 	}
+	vmaxset(vmax);
     }
 
     if(dll.type != FILENAME && strlen(ns)) {
@@ -1389,7 +1391,7 @@ SEXP attribute_hidden do_dotCode(SEXP call, SEXP op, SEXP args, SEXP env)
     R_RegisteredNativeSymbol symbol = {R_C_SYM, {NULL}, NULL};
     R_NativePrimitiveArgType *checkTypes = NULL;
     R_NativeArgStyle *argStyles = NULL;
-    void *vmax;
+    const void *vmax;
     char symName[MaxSymbolBytes];
 
     if (length(args) < 1) errorcall(call, _("'.NAME' is missing"));
@@ -1484,7 +1486,7 @@ SEXP attribute_hidden do_dotCode(SEXP call, SEXP op, SEXP args, SEXP env)
 	   the data pointer of the return value for the other atomic
 	   vectors, and anything else is supposed to be read-only.
 
-	   We do not need to copy if the inputs have NAMED = 0 */
+	   We do not need to copy if the inputs have no references */
 
 #ifdef LONG_VECTOR_SUPPORT
 	if (isVector(s) && IS_LONG_VEC(s))
@@ -1501,7 +1503,7 @@ SEXP attribute_hidden do_dotCode(SEXP call, SEXP op, SEXP args, SEXP env)
 		ptr += NG;
 		memcpy(ptr, RAW(s), n);
 		cargs[na] = (void *) ptr;
-	    } else if (dup && NAMED(s)) {
+	    } else if (dup && MAYBE_REFERENCED(s)) {
 		n = XLENGTH(s);
 		SEXP ss = allocVector(t, n);
 		memcpy(RAW(ss), RAW(s), n * sizeof(Rbyte));
@@ -1526,7 +1528,7 @@ SEXP attribute_hidden do_dotCode(SEXP call, SEXP op, SEXP args, SEXP env)
 		ptr += NG;
 		memcpy(ptr, INTEGER(s), n * sizeof(int));
 		cargs[na] = (void*) ptr;
-	    } else if (dup && NAMED(s)) {
+	    } else if (dup && MAYBE_REFERENCED(s)) {
 		SEXP ss = allocVector(t, n);
 		memcpy(INTEGER(ss), INTEGER(s), n * sizeof(int));
 		SET_VECTOR_ELT(ans, na, ss);
@@ -1557,7 +1559,7 @@ SEXP attribute_hidden do_dotCode(SEXP call, SEXP op, SEXP args, SEXP env)
 		ptr += NG;
 		memcpy(ptr, REAL(s), n * sizeof(double));
 		cargs[na] = (void*) ptr;
-	    } else if (dup && NAMED(s)) {
+	    } else if (dup && MAYBE_REFERENCED(s)) {
 		SEXP ss  = allocVector(t, n);
 		memcpy(REAL(ss), REAL(s), n * sizeof(double));
 		SET_VECTOR_ELT(ans, na, ss);
@@ -1580,7 +1582,7 @@ SEXP attribute_hidden do_dotCode(SEXP call, SEXP op, SEXP args, SEXP env)
 		ptr += NG;
 		memcpy(ptr, COMPLEX(s), n * sizeof(Rcomplex));
 		cargs[na] = (void*) ptr;
-	    } else if (dup && NAMED(s)) {
+	    } else if (dup && MAYBE_REFERENCED(s)) {
 		SEXP ss = allocVector(t, n);
 		memcpy(COMPLEX(ss), COMPLEX(s), n * sizeof(Rcomplex));
 		SET_VECTOR_ELT(ans, na, ss);

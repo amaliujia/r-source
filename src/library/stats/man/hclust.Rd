@@ -1,6 +1,6 @@
 % File src/library/stats/man/hclust.Rd
 % Part of the R package, http://www.R-project.org
-% Copyright 1995-2007 R Core Team
+% Copyright 1995-2014 R Core Team
 % Distributed under GPL 2 or later
 
 \newcommand{\CRANpkg}{\href{http://CRAN.R-project.org/package=#1}{\pkg{#1}}}
@@ -9,7 +9,6 @@
 \title{Hierarchical Clustering}
 \alias{hclust}
 \alias{plot.hclust}
-\alias{plclust}
 \alias{print.hclust}
 \description{
   Hierarchical cluster analysis on a set of dissimilarities and
@@ -18,52 +17,45 @@
 \usage{
 hclust(d, method = "complete", members = NULL)
 
-\method{plot}{hclust}(x, labels = NULL, hang = 0.1,
+\method{plot}{hclust}(x, labels = NULL, hang = 0.1, check = TRUE,
      axes = TRUE, frame.plot = FALSE, ann = TRUE,
      main = "Cluster Dendrogram",
      sub = NULL, xlab = NULL, ylab = "Height", \dots)
-
-plclust(tree, hang = 0.1, unit = FALSE, level = FALSE, hmin = 0,
-        square = TRUE, labels = NULL, plot. = TRUE,
-        axes = TRUE, frame.plot = FALSE, ann = TRUE,
-        main = "", sub = NULL, xlab = NULL, ylab = "Height")
 }
 \arguments{
   \item{d}{a dissimilarity structure as produced by \code{dist}.}
 
-  \item{method}{the agglomeration method to be used. This should
+  \item{method}{the agglomeration method to be used.  This should
     be (an unambiguous abbreviation of) one of
-    \code{"ward"}, \code{"single"}, \code{"complete"},
-    \code{"average"}, \code{"mcquitty"}, \code{"median"} or
-    \code{"centroid"}.}
+    \code{"ward.D"}, \code{"ward.D2"}, \code{"single"}, \code{"complete"},
+    \code{"average"} (= UPGMA), \code{"mcquitty"} (= WPGMA),
+    \code{"median"} (= WPGMC) or \code{"centroid"} (= UPGMC).}
 
   \item{members}{\code{NULL} or a vector with length size of
     \code{d}. See the \sQuote{Details} section.}
 
-  \item{x,tree}{an object of the type produced by \code{hclust}.}
+  \item{x}{an object of the type produced by \code{hclust}.}
 
   \item{hang}{The fraction of the plot height by which labels should hang
     below the rest of the plot.
     A negative value will cause the labels to hang down from 0.}
-
+  \item{check}{logical indicating if the \code{x} object should be
+    checked for validity.  This check is not necessary when \code{x}
+    is known to be valid such as when it is the direct result of
+    \code{hclust()}.  The default is \code{check=TRUE}, as invalid
+    inputs may crash \R due to memory violation in the internal C
+    plotting code.}
   \item{labels}{A character vector of labels for the leaves of the
-    tree. By default the row names or row numbers of the original data are
-    used. If \code{labels = FALSE} no labels at all are plotted.}
+    tree.  By default the row names or row numbers of the original data are
+    used.  If \code{labels = FALSE} no labels at all are plotted.}
 
   \item{axes, frame.plot, ann}{logical flags as in \code{\link{plot.default}}.}
+
   \item{main, sub, xlab, ylab}{character strings for
     \code{\link{title}}.  \code{sub} and \code{xlab} have a non-NULL
     default when there's a \code{tree$call}.}
-  \item{\dots}{Further graphical arguments.}
-
-  \item{unit}{logical.  If true, the splits are plotted at
-    equally-spaced heights rather than at the height in the object.}
-
-  \item{hmin}{numeric.  All heights less than \code{hmin} are regarded
-    as being \code{hmin}: this can be used to suppress detail at the
-    bottom of the tree.}
-  \item{level, square, plot.}{as yet unimplemented arguments of
-    \code{plclust} for S-PLUS compatibility.}
+  \item{\dots}{Further graphical arguments.  E.g., \code{cex} controls
+    the size of the labels (if plotted) in the same way as \code{\link{text}}.}
 }
 \value{
   An object of class \bold{hclust} which describes the
@@ -105,9 +97,6 @@ plclust(tree, hang = 0.1, unit = FALSE, level = FALSE, hmin = 0,
   There are \code{\link{print}}, \code{\link{plot}} and \code{identify}
   (see \code{\link{identify.hclust}}) methods and the
   \code{\link{rect.hclust}()} function for \code{hclust} objects.
-  The \code{plclust()} function is basically the same as the plot method,
-  \code{plot.hclust}, primarily for back compatibility with S-PLUS. Its
-  extra arguments are not yet implemented.
 }
 \details{
   This function performs a hierarchical cluster analysis
@@ -130,7 +119,17 @@ plclust(tree, hang = 0.1, unit = FALSE, level = FALSE, hmin = 0,
   methods.  Note however, that methods \code{"median"} and
   \code{"centroid"} are \emph{not} leading to a \emph{monotone distance}
   measure, or equivalently the resulting dendrograms can have so called
-  \emph{inversions} (which are hard to interpret).
+  \emph{inversions} or \emph{reversals} which are hard to interpret,
+  but note the trichotomies in Legendre and Legendre (2012).
+
+  Two different algorithms are found in the literature for Ward clustering.
+  The one used by option \code{"ward.D"} (equivalent to the only Ward
+  option \code{"ward"} in \R versions \eqn{\le}{<=} 3.0.3) \emph{does not} implement
+  Ward's (1963) clustering criterion, whereas option \code{"ward.D2"} implements
+  that criterion (Murtagh and Legendre 2014).  With the latter, the
+  dissimilarities are \emph{squared} before cluster updating.
+  Note that \code{\link[cluster]{agnes}(*, method="ward")} corresponds
+  to \code{hclust(*, "ward.D2")}.
 
   If \code{members != NULL}, then \code{d} is taken to be a
   dissimilarity matrix between clusters instead of dissimilarities
@@ -140,7 +139,7 @@ plclust(tree, hang = 0.1, unit = FALSE, level = FALSE, hmin = 0,
   reconstruct the part of the tree above a cut (see examples).
   Dissimilarities between clusters can be efficiently computed (i.e.,
   without \code{hclust} itself) only for a limited number of
-  distance/linkage combinations, the simplest one being squared
+  distance/linkage combinations, the simplest one being \emph{squared}
   Euclidean distance and centroid linkage.  In this case the
   dissimilarities between the clusters are the squared Euclidean
   distances between cluster means.
@@ -158,6 +157,10 @@ plclust(tree, hang = 0.1, unit = FALSE, level = FALSE, hmin = 0,
   and merges involving two observations place them in order by their
   observation sequence number.
 }
+\note{
+  Method \code{"centroid"} is typically meant to be used with
+  \emph{squared} Euclidean distances.
+}
 \references{
   Becker, R. A., Chambers, J. M. and Wilks, A. R. (1988)
   \emph{The New S Language}.
@@ -167,7 +170,7 @@ plclust(tree, hang = 0.1, unit = FALSE, level = FALSE, hmin = 0,
   \emph{Cluster Analysis}.
   London: Heinemann Educ. Books.
 
-  Hartigan, J. A. (1975).
+  Hartigan, J.A. (1975).
   \emph{Clustering  Algorithms}.
   New York: Wiley.
 
@@ -193,6 +196,15 @@ plclust(tree, hang = 0.1, unit = FALSE, level = FALSE, hmin = 0,
   Similarity Analysis by Reciprocal Pairs for Discrete and Continuous
   Data.
   \emph{Educational and Psychological Measurement}, \bold{26}, 825--831.
+
+  Legendre, P. and L. Legendre (2012).
+  \emph{Numerical Ecology},
+  3rd English ed. Amsterdam: Elsevier Science BV.
+
+  Murtagh, Fionn and Legendre, Pierre (2014).
+  Ward's hierarchical agglomerative clustering method: which algorithms
+  implement Ward's criterion?
+  \emph{Journal of Classification} \bold{31} (forthcoming).
 }
 \author{
   The \code{hclust} function is based on Fortran code
@@ -208,11 +220,13 @@ plclust(tree, hang = 0.1, unit = FALSE, level = FALSE, hmin = 0,
 \examples{
 require(graphics)
 
+### Example 1: Violent crime rates by US state
+
 hc <- hclust(dist(USArrests), "ave")
 plot(hc)
 plot(hc, hang = -1)
 
-## Do the same with centroid clustering and squared Euclidean distance,
+## Do the same with centroid clustering and *squared* Euclidean distance,
 ## cut the tree into ten clusters and reconstruct the upper part of the
 ## tree from the cluster centers.
 hc <- hclust(dist(USArrests)^2, "cen")

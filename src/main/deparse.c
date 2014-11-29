@@ -1,7 +1,7 @@
 /*
  *  R : A Computer Language for Statistical Data Analysis
  *  Copyright (C) 1995, 1996  Robert Gentleman and Ross Ihaka
- *  Copyright (C) 1997--2012  The R Core Team
+ *  Copyright (C) 1997--2014  The R Core Team
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -339,6 +339,8 @@ SEXP attribute_hidden do_dput(SEXP call, SEXP op, SEXP args, SEXP rho)
 	UNPROTECT(1);
     }
     PROTECT(tval); /* against Rconn_printf */
+    if(!inherits(CADR(args), "connection"))
+	error(_("'file' must be a character string or connection"));
     ifile = asInteger(CADR(args));
 
     wasopen = 1;
@@ -387,6 +389,8 @@ SEXP attribute_hidden do_dump(SEXP call, SEXP op, SEXP args, SEXP rho)
 
     names = CAR(args);
     file = CADR(args);
+    if(!inherits(file, "connection"))
+	error(_("'file' must be a character string or connection"));
     if(!isString(names))
 	error( _("character arguments expected"));
     nobjs = length(names);
@@ -405,10 +409,10 @@ SEXP attribute_hidden do_dump(SEXP call, SEXP op, SEXP args, SEXP rho)
     PROTECT(o = objs = allocList(nobjs));
 
     for (j = 0, nout = 0; j < nobjs; j++, o = CDR(o)) {
-	SET_TAG(o, install(translateChar(STRING_ELT(names, j))));
+	SET_TAG(o, installTrChar(STRING_ELT(names, j)));
 	SETCAR(o, findVar(TAG(o), source));
 	if (CAR(o) == R_UnboundValue)
-	    warning(_("object '%s' not found"), CHAR(PRINTNAME(TAG(o))));
+	    warning(_("object '%s' not found"), EncodeChar(PRINTNAME(TAG(o))));
 	else nout++;
     }
     o = objs;
@@ -643,6 +647,7 @@ static void printcomment(SEXP s, LocalParseData *d)
 {
     SEXP cmt;
     int i, ncmt;
+    const void *vmax = vmaxget();
 
     /* look for old-style comments first */
 
@@ -660,6 +665,7 @@ static void printcomment(SEXP s, LocalParseData *d)
 	    writeline(d);
 	}
     }
+    vmaxset(vmax);
 }
 
 
@@ -748,10 +754,12 @@ static void deparse2buff(SEXP s, LocalParseData *d)
 	break;
     case CHARSXP:
     {
+	const void *vmax = vmaxget();
 	const char *ts = translateChar(s);
 	/* versions of R < 2.7.0 cannot parse strings longer than 8192 chars */
 	if(strlen(ts) >= 8192) d->longstring = TRUE;
 	print2buff(ts, d);
+	vmaxset(vmax);
 	break;
     }
     case SPECIALSXP:
@@ -769,7 +777,7 @@ static void deparse2buff(SEXP s, LocalParseData *d)
 	    d->opts = localOpts;
 	    print2buff(">", d);
 	} else {
-	    PROTECT(s = eval(s, NULL)); /* eval uses env of promise */
+	    PROTECT(s = eval(s, R_EmptyEnv)); /* eval uses env of promise */
 	    deparse2buff(s, d);
 	    UNPROTECT(1);
 	}
@@ -856,13 +864,16 @@ static void deparse2buff(SEXP s, LocalParseData *d)
 	    if ((TYPEOF(SYMVALUE(op)) == BUILTINSXP) ||
 		(TYPEOF(SYMVALUE(op)) == SPECIALSXP) ||
 		(userbinop = isUserBinop(op))) {
+		s = CDR(s);
 		if (userbinop) {
-		    fop.kind = PP_BINARY2;    /* not quite right for spacing, but can't be unary */
-		    fop.precedence = PREC_PERCENT;
-		    fop.rightassoc = 0;
+		    if (isNull(getAttrib(s, R_NamesSymbol))) {  
+			fop.kind = PP_BINARY2;    /* not quite right for spacing, but can't be unary */
+			fop.precedence = PREC_PERCENT;
+			fop.rightassoc = 0;
+		    } else 
+			fop.kind = PP_FUNCALL;  /* if args are named, deparse as function call (PR#15350) */
 		} else 
 		    fop = PPINFO(SYMVALUE(op));
-		s = CDR(s);
 		if (fop.kind == PP_BINARY) {
 		    switch (length(s)) {
 		    case 1:
@@ -995,10 +1006,12 @@ static void deparse2buff(SEXP s, LocalParseData *d)
 		    } else {
 			s = CADDR(s);
 			n = length(s);
+			const void *vmax = vmaxget();
 			for(i = 0 ; i < n ; i++) {
 			    print2buff(translateChar(STRING_ELT(s, i)), d);
 			    writeline(d);
 			}
+			vmaxset(vmax);
 		    }
 		    break;
 		case PP_ASSIGN:
@@ -1237,10 +1250,37 @@ static void print2buff(const char *strng, LocalParseData *d)
     d->len += (int) tlen;
 }
 
+/*
+ * Encodes a complex value as a syntactically correct
+ * string that can be reparsed by R. This is required
+ * because by default strings like '1+Infi' or '3+NaNi' 
+ * are produced which are not valid complex literals.
+ */
+
+#define NB 1000  /* Same as printutils.c */
+static const char *EncodeNonFiniteComplexElement(Rcomplex x, char* buff)
+{
+    int w, d, e, wi, di, ei;
+
+    // format a first time to get width/decimals
+    formatComplex(&x, 1, &w, &d, &e, &wi, &di, &ei, 0);
+	
+    char Re[NB];
+    char Im[NB];
+
+    strcpy(Re, EncodeReal(x.r, w, d, e, '.'));
+    strcpy(Im, EncodeReal(x.i, wi, di, ei, '.'));
+    
+    snprintf(buff, NB, "complex(real=%s, imaginary=%s)", Re, Im);
+    buff[NB-1] = '\0';
+    return buff;
+}
+
 static void vector2buff(SEXP vector, LocalParseData *d)
 {
     int tlen, i, quote;
     const char *strp;
+    char *buff = 0;
     Rboolean surround = FALSE, allNA, addL = TRUE;
 
     tlen = length(vector);
@@ -1269,7 +1309,8 @@ static void vector2buff(SEXP vector, LocalParseData *d)
 	int *tmp = INTEGER(vector);
 
 	for(i = 1; i < tlen; i++) {
-	    if(tmp[i] - tmp[i-1] != 1) {
+	    if((tmp[i] == NA_INTEGER) || (tmp[i-1] == NA_INTEGER)
+	       || (tmp[i] - tmp[i-1] != 1)) {
 		intSeq = FALSE;
 		break;
 	    }
@@ -1343,6 +1384,9 @@ static void vector2buff(SEXP vector, LocalParseData *d)
 		surround = TRUE;
 		print2buff("as.character(", d);
 	    }
+	} else if(TYPEOF(vector) == RAWSXP) {
+	    surround = TRUE;
+	    print2buff("as.raw(", d);
 	}
 	if(tlen > 1) print2buff("c(", d);
 	allNA = allNA && !(d->opts & S_COMPAT);
@@ -1350,10 +1394,15 @@ static void vector2buff(SEXP vector, LocalParseData *d)
 	    if(allNA && TYPEOF(vector) == REALSXP &&
 	       ISNA(REAL(vector)[i])) {
 		strp = "NA_real_";
-	    } else if (allNA && TYPEOF(vector) == CPLXSXP &&
+	    } else if (TYPEOF(vector) == CPLXSXP &&
 		       (ISNA(COMPLEX(vector)[i].r)
-			|| ISNA(COMPLEX(vector)[i].i)) ) {
-		strp = "NA_complex_";
+			&& ISNA(COMPLEX(vector)[i].i)) ) {
+		strp = allNA ? "NA_complex_" : EncodeElement(vector, i, quote, '.');
+	    } else if(TYPEOF(vector) == CPLXSXP && 
+	    	      (ISNAN(COMPLEX(vector)[i].r) || !R_FINITE(COMPLEX(vector)[i].i)) ) {
+	    	if (!buff)
+	    	    buff = alloca(NB);
+		strp = EncodeNonFiniteComplexElement(COMPLEX(vector)[i], buff);
 	    } else if (allNA && TYPEOF(vector) == STRSXP &&
 		       STRING_ELT(vector, i) == NA_STRING) {
 		strp = "NA_character_";
@@ -1362,10 +1411,14 @@ static void vector2buff(SEXP vector, LocalParseData *d)
 		formatReal(&REAL(vector)[i], 1, &w, &d, &e, 0);
 		strp = EncodeReal2(REAL(vector)[i], w, d, e);
 	    } else if (TYPEOF(vector) == STRSXP) {
+		const void *vmax = vmaxget();
 		const char *ts = translateChar(STRING_ELT(vector, i));
 		/* versions of R < 2.7.0 cannot parse strings longer than 8192 chars */
 		if(strlen(ts) >= 8192) d->longstring = TRUE;
 		strp = EncodeElement(vector, i, quote, '.');
+		vmaxset(vmax);
+	    } else if (TYPEOF(vector) == RAWSXP) {
+		strp = EncodeRaw(RAW(vector)[i], "0x");
 	    } else
 		strp = EncodeElement(vector, i, quote, '.');
 	    print2buff(strp, d);
@@ -1383,6 +1436,7 @@ static void vector2buff(SEXP vector, LocalParseData *d)
 static void src2buff1(SEXP srcref, LocalParseData *d)
 {
     int i,n;
+    const void *vmax = vmaxget();
     PROTECT(srcref);
 
     PROTECT(srcref = lang2(install("as.character"), srcref));
@@ -1393,6 +1447,7 @@ static void src2buff1(SEXP srcref, LocalParseData *d)
 	if(i < n-1) writeline(d);
     }
     UNPROTECT(3);
+    vmaxset(vmax);
 }
 
 /* src2buff : Deparse source element k to buffer, if possible; return FALSE on failure */
@@ -1417,6 +1472,7 @@ static void vec2buff(SEXP v, LocalParseData *d)
     SEXP nv, sv;
     int i, n /*, localOpts = d->opts */;
     Rboolean lbreak = FALSE;
+    const void *vmax = vmaxget();
 
     n = length(v);
     nv = getAttrib(v, R_NamesSymbol);
@@ -1455,6 +1511,7 @@ static void vec2buff(SEXP v, LocalParseData *d)
     }
     if (lbreak)
 	d->indent--;
+    vmaxset(vmax);
 }
 
 static void args2buff(SEXP arglist, int lineb, int formals, LocalParseData *d)

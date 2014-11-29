@@ -1,7 +1,7 @@
 #  File src/library/utils/R/windows/sysutils.R
 #  Part of the R package, http://www.R-project.org
 #
-#  Copyright (C) 1995-2012 The R Core Team
+#  Copyright (C) 1995-2013 The R Core Team
 #
 #  This program is free software; you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
@@ -48,7 +48,7 @@ setWindowTitle <- function(suffix, title = paste(getIdentification(), suffix))
 
 getWindowTitle <- function() .Call(C_getWindowTitle)
 
-setStatusBar <- function(text) .Call(setStatusBar, text)
+setStatusBar <- function(text) .Call(C_setStatusBar, text)
 
 getWindowsHandle <- function(which = "Console") {
     if (is.numeric(which)) {

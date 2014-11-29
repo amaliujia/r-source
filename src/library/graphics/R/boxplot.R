@@ -1,7 +1,7 @@
 #  File src/library/graphics/R/boxplot.R
 #  Part of the R package, http://www.R-project.org
 #
-#  Copyright (C) 1995-2012 The R Core Team
+#  Copyright (C) 1995-2013 The R Core Team
 #
 #  This program is free software; you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
@@ -99,7 +99,7 @@ boxplot.formula <-
     m$... <- NULL
     m$na.action <- na.action # force use of default for this method
     require(stats, quietly = TRUE)
-    m[[1L]] <- as.name("model.frame")
+    m[[1L]] <- quote(stats::model.frame)
     mf <- eval(m, parent.frame())
     response <- attr(attr(mf, "terms"), "response")
     boxplot(split(mf[[response]], mf[-response]), ...)
@@ -118,7 +118,7 @@ bxp <- function(z, notch = FALSE, width = NULL, varwidth = FALSE,
     {
 	## Draw single box plot
         ok <- TRUE
-	if(!any(is.na(stats))) {
+	if(!anyNA(stats)) {
 	    ## stats = +/- Inf:	polygon & segments should handle
 
 	    ## Compute 'x + w' -- "correctly" in log-coord. case:
@@ -259,7 +259,7 @@ bxp <- function(z, notch = FALSE, width = NULL, varwidth = FALSE,
 
     width <-
 	if(!is.null(width)) {
-	    if(length(width) != n | any(is.na(width)) | any(width <= 0))
+	    if(length(width) != n | anyNA(width) | any(width <= 0))
 		stop("invalid boxplot widths")
 	    boxwex * width/max(width)
 	}

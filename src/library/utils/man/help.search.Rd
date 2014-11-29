@@ -1,6 +1,6 @@
 % File src/library/utils/man/help.search.Rd
 % Part of the R package, http://www.R-project.org
-% Copyright 1995-2009 R Core Team
+% Copyright 1995-2013 R Core Team
 % Distributed under GPL 2 or later
 
 \name{help.search}
@@ -98,10 +98,10 @@ help.search(pattern, fields = c("alias", "concept", "title"),
   The arguments \code{apropos} and \code{whatis} play a role similar to
   the Unix commands with the same names.
 
-  Searching with \code{agrep = FALSE} will be several times faster
-  than the default (once the database is built).  However, as from
-  \R 2.10.0 approximate searches should be fast enough (around a second
-  with 2000 packages installed).
+  Searching with \code{agrep = FALSE} will be several times faster than
+  the default (once the database is built).  However, approximate
+  searches should be fast enough (around a second with 5000 packages
+  installed).
 
   If possible, the help database is saved in memory for use by
   subsequent calls in the session.
@@ -150,7 +150,7 @@ help.search("non-existent topic")
 
 ??utils::help  # All the topics matching "help" in the utils package
 
-\dontrun{
+\donttest{
 help.search("print")            # All help pages with topics or title
                                 # matching 'print'
 help.search(apropos = "print")  # The same

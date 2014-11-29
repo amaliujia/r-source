@@ -1,6 +1,6 @@
 % File src/library/stats/man/manova.Rd
 % Part of the R package, http://www.R-project.org
-% Copyright 1995-2007 R Core Team
+% Copyright 1995-2013 R Core Team
 % Distributed under GPL 2 or later
 
 \name{manova}
@@ -37,9 +37,6 @@ manova(\dots)
   Chapman and Hall.
 }
 \examples{
-## From Venables and Ripley (2002) p.165.
-utils::data(npk, package = "MASS")
-
 ## Set orthogonal contrasts.
 op <- options(contrasts = c("contr.helmert", "contr.poly"))
 

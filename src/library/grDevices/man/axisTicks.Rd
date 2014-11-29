@@ -1,6 +1,6 @@
 % File src/library/grDevices/man/axisTicks.Rd
 % Part of the R package, http://www.R-project.org
-% Copyright 2011-2 R Core Team
+% Copyright 2011-2013 R Core Team
 % Distributed under GPL 2 or later
 
 \name{axisTicks}
@@ -58,7 +58,8 @@ axisTicks(usr, log, axp = NULL, nint = 5)
 require("graphics")
 plot(10*(0:10)); (pu <- par("usr"))
 aX <- function(side, at, ...)
-    axis(side, at = at, labels = FALSE, lwd.ticks = 2, col.ticks = 2, tck = 0.05, ...)
+    axis(side, at = at, labels = FALSE, lwd.ticks = 2, col.ticks = 2,
+         tck = 0.05, ...)
 aX(1, print(xa <- axisTicks(pu[1:2], log = FALSE)))  # x axis
 aX(2, print(ya <- axisTicks(pu[3:4], log = FALSE)))  # y axis
 

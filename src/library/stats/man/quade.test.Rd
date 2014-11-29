@@ -1,6 +1,6 @@
 % File src/library/stats/man/quade.test.Rd
 % Part of the R package, http://www.R-project.org
-% Copyright 1995-2007 R Core Team
+% Copyright 1995-2013 R Core Team
 % Distributed under GPL 2 or later
 
 \name{quade.test}
@@ -68,7 +68,7 @@ quade.test(y, \dots)
   D. Quade (1979),
   Using weighted rankings in the analysis of complete blocks with
   additive block effects.
-  \emph{Journal of the American Statistical Association}, \bold{74},
+  \emph{Journal of the American Statistical Association} \bold{74},
   680--683.
 
   William J. Conover (1999),

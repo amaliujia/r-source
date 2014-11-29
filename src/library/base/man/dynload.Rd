@@ -3,6 +3,8 @@
 % Copyright 1995-2013 R Core Team
 % Distributed under GPL 2 or later
 
+\newcommand{\sspace}{\ifelse{latex}{\out{~}}{ }}
+
 \name{dyn.load}
 \alias{dyn.load}
 \alias{dyn.unload}
@@ -72,7 +74,7 @@ is.loaded(symbol, PACKAGE = "", type = "")
   \sQuote{R Installation and Administration} manuals for how to create
   and install a suitable DLL.
 
-  Unfortunately a very few platforms (e.g. Compaq Tru64) do not handle
+  Unfortunately a very few platforms (e.g., Compaq Tru64) do not handle
   the \code{PACKAGE} argument correctly, and may incorrectly find
   symbols linked into \R.
 
@@ -182,7 +184,7 @@ is.loaded(symbol, PACKAGE = "", type = "")
   \itemize{
     \item The directory from which the application was launched.
     \item The various system directories,
-    e.g. \file{c:/Windows/system32}, \file{c:/Windows/system} and
+    e.g.\sspace{}\file{c:/Windows/system32}, \file{c:/Windows/system} and
     \file{c:/Windows}.
     \item The current directory.
     \item Along the search path for executables given by the environment
@@ -199,9 +201,18 @@ is.loaded(symbol, PACKAGE = "", type = "")
   makes use of the Windows system call \code{SetDllDirectory} to insert
   the value of \code{DLLpath} in second place, and removes the current
   directory, for the duration of that \code{dyn.load} call.  (Note that
-  only one directory can be inserted in this way.)  On Windows 2000, the
-  second item in the search order is the current directory, and the
-  current directory is changed temporarily to implement \code{DLLpath}.
+  only one directory can be inserted in this way.)
+
+  Users have been confused by messages like
+\preformatted{
+ error: unable to load shared object
+ '.../library/rJava/libs/x64/rJava.dll':
+ LoadLibrary failure:  The specified module could not be found.
+}
+   The final line is a Windows (not \R) diagnostic: the \sQuote{module}
+   that could not be found is not \file{rJava.dll} but something else
+   Windows is looking for (here most likely Java DLLs): if you are lucky
+   there will be a dialog box with more details.
 }
 #endif
 \section{Warning}{

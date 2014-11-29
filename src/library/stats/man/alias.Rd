@@ -1,7 +1,9 @@
 % File src/library/stats/man/alias.Rd
 % Part of the R package, http://www.R-project.org
-% Copyright 1995-2007 R Core Team
+% Copyright 1995-2014 R Core Team
 % Distributed under GPL 2 or later
+
+\newcommand{\CRANpkg}{\href{http://CRAN.R-project.org/package=#1}{\pkg{#1}}}
 
 \name{alias}
 \title{Find Aliases (Dependencies) in a Model}
@@ -41,9 +43,12 @@ alias(object, \dots)
   have their coefficients omitted from the fit. Partial aliasing refers
   to effects that can be estimated less precisely because of
   correlations induced by the design.
+  
+  Some parts of the \code{"lm"} method require recommended package
+  \CRANpkg{MASS} to be installed. 
 }
 \value{
-  A list (of \code{\link{class}} \code{"listof"}) containing components
+  A list (of \code{\link{class}} \code{"\link{listof}"}) containing components
   \item{Model}{Description of the model; usually the formula.}
   \item{Complete}{A matrix with columns corresponding to effects that
     are linearly dependent on the rows.}
@@ -65,15 +70,12 @@ alias(object, \dots)
 }
 \author{
   The design was inspired by the S function of the same name described
-  in Chambers \emph{et al.} (1992).
+  in Chambers \emph{et al} (1992).
 }
-\examples{
-## From Venables and Ripley (2002) p.165.
-utils::data(npk, package = "MASS")
-
+\examples{\donttest{
 op <- options(contrasts = c("contr.helmert", "contr.poly"))
 npk.aov <- aov(yield ~ block + N*P*K, npk)
 alias(npk.aov)
 options(op)  # reset
-}
+}}
 \keyword{models}

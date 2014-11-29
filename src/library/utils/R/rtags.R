@@ -1,7 +1,7 @@
 #  File src/library/tools/R/rtags.R
 #  Part of the R package, http://www.R-project.org
 #
-#  Copyright (C) 1995-2012 The R Core Team
+#  Copyright (C) 1995-2013 The R Core Team
 #
 #  This program is free software; you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
@@ -180,30 +180,21 @@ rtags <-
              ofile = "", append = FALSE,
              verbose = getOption("verbose"))
 {
-    if (ofile != "" && !append) file.remove(ofile)
+    if (ofile != "" && !append) {
+        if (!file.create(ofile, showWarnings = FALSE))
+            stop(gettextf("Could not create file %s, aborting", ofile),
+                 domain = NA)
+    }
     if (!missing(keep.re))
         src <- grep(keep.re, src, value = TRUE)
     for (s in src)
     {
         if (verbose) message(gettextf("Processing file %s", s), domain = NA)
-       tryCatch(
+        tryCatch(
                  rtags.file(s, ofile = ofile, append = TRUE),
                  error = function(e) NULL)
     }
     invisible()
-}
-
-
-
-## Typical usage:
-
-if (FALSE)
-{
-
-    ## to tag all .[RrSs] files under /path/to/src/repository/ that
-    ## have "/R/" in the full path
-
-
 }
 
 

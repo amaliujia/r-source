@@ -1,7 +1,7 @@
 #  File src/library/graphics/R/image.R
 #  Part of the R package, http://www.R-project.org
 #
-#  Copyright (C) 1995-2012 The R Core Team
+#  Copyright (C) 1995-2013 The R Core Team
 #
 #  This program is free software; you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
@@ -112,11 +112,11 @@ image.default <- function (x = seq(0, 1, length.out = nrow(z)),
         (length(dy) && !isTRUE(all.equal(dy, rep(dy[1], length(dy)))))
     }
     if (missing(useRaster)) {
-       useRaster <-  getOption("preferRaster", FALSE)
+       useRaster <- getOption("preferRaster", FALSE)
        if (useRaster && check_irregular(x, y)) useRaster <- FALSE
        if (useRaster) {
            useRaster <- FALSE
-           ras <- dev.capabilities("raster")
+           ras <- dev.capabilities("rasterImage")$rasterImage
            if(identical(ras, "yes")) useRaster <- TRUE
            if(identical(ras, "non-missing")) useRaster <- all(!is.na(zi))
        }

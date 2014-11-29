@@ -1,7 +1,7 @@
 #  File src/library/stats/R/filter.R
 #  Part of the R package, http://www.R-project.org
 #
-#  Copyright (C) 1999-2012 The R Core Team
+#  Copyright (C) 1999-2013 The R Core Team
 #
 #  This program is free software; you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
@@ -29,7 +29,7 @@ filter <- function(x, filter, method = c("convolution", "recursive"),
     filter <- as.double(filter)
     nfilt <- as.integer(length(filter))
     if (is.na(n)) stop("invalid value of length(filter)", domain = NA)
-    if(any(is.na(filter))) stop("missing values in 'filter'")
+    if(anyNA(filter)) stop("missing values in 'filter'")
 
     if(method == "convolution") {
         if(nfilt > n) stop("'filter' is longer than time series")

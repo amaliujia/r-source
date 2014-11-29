@@ -1,7 +1,7 @@
 #  File src/library/stats/R/models.R
 #  Part of the R package, http://www.R-project.org
 #
-#  Copyright (C) 1995-2012 The R Core Team
+#  Copyright (C) 1995-2014 The R Core Team
 #
 #  This program is free software; you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
@@ -354,10 +354,10 @@ model.frame.default <-
         m <- match(c("formula", "data", "subset", "weights", "na.action"),
                    names(fcall), 0)
         fcall <- fcall[c(1, m)]
-        fcall[[1L]] <- as.name("model.frame")
+        fcall[[1L]] <- quote(stats::model.frame)
         env <- environment(formula$terms)
 	if (is.null(env)) env <- parent.frame()
-        return(eval(fcall, env, parent.frame()))
+        return(eval(fcall, env)) # 2-arg form as env is an environment
     }
     if(missing(formula)) {
 	if(!missing(data) && inherits(data, "data.frame") &&
@@ -490,10 +490,12 @@ model.matrix.default <- function(object, data = environment(object),
     if (is.null(attr(data, "terms")))
 	data <- model.frame(object, data, xlev=xlev)
     else {
-	reorder <- match(sapply(attr(t,"variables"),deparse,
-                                width.cutoff=500)[-1L],
+        ## need complete deparse, PR#15377
+        deparse2 <- function(x)
+            paste(deparse(x, width.cutoff = 500L), collapse = " ")
+	reorder <- match(sapply(attr(t, "variables"), deparse2)[-1L],
                          names(data))
-	if (any(is.na(reorder)))
+	if (anyNA(reorder))
 	    stop("model frame and formula mismatch in model.matrix()")
 	if(!identical(reorder, seq_len(ncol(data))))
 	    data <- data[,reorder, drop=FALSE]
@@ -602,12 +604,14 @@ makepredictcall.default  <- function(var, call)
 
 .getXlevels <- function(Terms, m)
 {
-    xvars <- sapply(attr(Terms, "variables"), deparse, width.cutoff=500)[-1L]
+    deparse2 <- function(x)
+        paste(deparse(x, width.cutoff = 500L), collapse = " ")
+    xvars <- sapply(attr(Terms, "variables"), deparse2)[-1L]
     if((yvar <- attr(Terms, "response")) > 0) xvars <- xvars[-yvar]
     if(length(xvars)) {
-        xlev <- lapply(m[xvars], 
-        	    function(x) 
-        	    	if(is.factor(x)) levels(x) 
+        xlev <- lapply(m[xvars],
+        	    function(x)
+        	    	if(is.factor(x)) levels(x)
         	    	else if (is.character(x)) levels(as.factor(x))
         	    	else NULL)
         xlev[!vapply(xlev, is.null, NA)]

@@ -1,6 +1,6 @@
 
-R version 3.0.0 Patched (2013-04-04 r62492) -- "Masked Marvel"
-Copyright (C) 2013 The R Foundation for Statistical Computing
+R version 3.1.2 RC (2014-10-29 r66897) -- "Pumpkin Helmet"
+Copyright (C) 2014 The R Foundation for Statistical Computing
 Platform: x86_64-unknown-linux-gnu (64-bit)
 
 R is free software and comes with ABSOLUTELY NO WARRANTY.
@@ -144,6 +144,40 @@ lm2  6 336.3417
  [1] 0.00 0.05 0.10 0.15 0.20 0.25 0.30 0.35 0.40 0.45 0.50 0.55 0.60 0.65 0.70
 [16] 0.75 0.80 0.85 0.90 0.95 1.00
 > 
+> ## Visualization, including limit cases:
+> pl.beta <- function(a,b, asp = if(isLim) 1, ylim = if(isLim) c(0,1.1)) {
++   if(isLim <- a == 0 || b == 0 || a == Inf || b == Inf) {
++     eps <- 1e-10
++     x <- c(0, eps, (1:7)/16, 1/2+c(-eps,0,eps), (9:15)/16, 1-eps, 1)
++   } else {
++     x <- seq(0, 1, length = 1025)
++   }
++   fx <- cbind(dbeta(x, a,b), pbeta(x, a,b), qbeta(x, a,b))
++   f <- fx; f[fx == Inf] <- 1e100
++   matplot(x, f, ylab="", type="l", ylim=ylim, asp=asp,
++           main = sprintf("[dpq]beta(x, a=%g, b=%g)", a,b))
++   abline(0,1,     col="gray", lty=3)
++   abline(h = 0:1, col="gray", lty=3)
++   legend("top", paste0(c("d","p","q"), "beta(x, a,b)"),
++          col=1:3, lty=1:3, bty = "n")
++   invisible(cbind(x, fx))
++ }
+> pl.beta(3,1)
+> 
+> pl.beta(2, 4)
+> pl.beta(3, 7)
+> pl.beta(3, 7, asp=1)
+> 
+> pl.beta(0, 0)   ## point masses at  {0, 1}
+> 
+> pl.beta(0, 2)   ## point mass at 0 ; the same as
+> pl.beta(1, Inf)
+> 
+> pl.beta(Inf, 2) ## point mass at 1 ; the same as
+> pl.beta(3, 0)
+> 
+> pl.beta(Inf, Inf)# point mass at 1/2
+> 
 > 
 > 
 > cleanEx()
@@ -241,23 +275,6 @@ lm2  6 336.3417
   8 | 23
 
 > 
-> ## Not run: 
-> ##D ## visual testing
-> ##D ## do P-P plots for 1000 points at various degrees of freedom
-> ##D L <- 1.2; n <- 1000; pp <- ppoints(n)
-> ##D op <- par(mfrow = c(3,3), mar = c(3,3,1,1)+.1, mgp = c(1.5,.6,0),
-> ##D           oma = c(0,0,3,0))
-> ##D for(df in 2^(4*rnorm(9))) {
-> ##D   plot(pp, sort(pchisq(rr <- rchisq(n, df = df, ncp = L), df = df, ncp = L)),
-> ##D        ylab = "pchisq(rchisq(.),.)", pch = ".")
-> ##D   mtext(paste("df = ", formatC(df, digits = 4)), line =  -2, adj = 0.05)
-> ##D   abline(0, 1, col = 2)
-> ##D }
-> ##D mtext(expression("P-P plots : Noncentral  "*
-> ##D                  chi^2 *"(n=1000, df=X, ncp= 1.2)"),
-> ##D       cex = 1.5, font = 2, outer = TRUE)
-> ##D par(op)
-> ## End(Not run)
 > 
 > ## "analytical" test
 > lam <- seq(0, 100, by = .25)
@@ -268,6 +285,7 @@ lm2  6 336.3417
 > 
 > 
 > 
+> graphics::par(get("par.postscript", pos = 'CheckExEnv'))
 > cleanEx()
 > nameEx("Exponential")
 > ### * Exponential
@@ -502,6 +520,71 @@ s12   0.92099
 > 
 > IQR(rivers)
 [1] 370
+> 
+> 
+> 
+> cleanEx()
+> nameEx("KalmanLike")
+> ### * KalmanLike
+> 
+> flush(stderr()); flush(stdout())
+> 
+> ### Name: KalmanLike
+> ### Title: Kalman Filtering
+> ### Aliases: KalmanLike KalmanRun KalmanSmooth KalmanForecast makeARIMA
+> ### Keywords: ts
+> 
+> ### ** Examples
+> 
+> ## an ARIMA fit
+> fit3 <- arima(presidents, c(3, 0, 0))
+> predict(fit3, 12)
+$pred
+         Qtr1     Qtr2     Qtr3     Qtr4
+1975 29.84194 34.41014 39.30815 43.02779
+1976 46.18808 48.56947 50.44866 51.86064
+1977 52.94295 53.75521 54.37019 54.83150
+
+$se
+         Qtr1     Qtr2     Qtr3     Qtr4
+1975  9.00655 11.25606 13.43389 14.51516
+1976 15.25538 15.65611 15.90158 16.03792
+1977 16.11764 16.16229 16.18785 16.20220
+
+> ## reconstruct this
+> pr <- KalmanForecast(12, fit3$model)
+> pr$pred + fit3$coef[4]
+ [1] 29.84194 34.41014 39.30815 43.02779 46.18808 48.56947 50.44866 51.86064
+ [9] 52.94295 53.75521 54.37019 54.83150
+> sqrt(pr$var * fit3$sigma2)
+ [1]  9.00655 11.25606 13.43389 14.51516 15.25538 15.65611 15.90158 16.03792
+ [9] 16.11764 16.16229 16.18785 16.20220
+> ## and now do it year by year
+> mod <- fit3$model
+> for(y in 1:3) {
++   pr <- KalmanForecast(4, mod, TRUE)
++   print(list(pred = pr$pred + fit3$coef["intercept"], 
++              se = sqrt(pr$var * fit3$sigma2)))
++   mod <- attr(pr, "mod")
++ }
+$pred
+[1] 29.84194 34.41014 39.30815 43.02779
+
+$se
+[1]  9.00655 11.25606 13.43389 14.51516
+
+$pred
+[1] 46.18808 48.56947 50.44866 51.86064
+
+$se
+[1] 15.25538 15.65611 15.90158 16.03792
+
+$pred
+[1] 52.94295 53.75521 54.37019 54.83150
+
+$se
+[1] 16.11764 16.16229 16.18785 16.20220
+
 > 
 > 
 > 
@@ -1126,33 +1209,28 @@ Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’
 
 Residual standard error: 0.04103 on 7 degrees of freedom
 
-> ## Don't show: 
+> 
+> ## Show the model components visually
 >   require(graphics)
 > 
 >   xx <- seq(0, 5, len = 101)
 >   y1 <- 3.5 * exp(-4*xx)
 >   y2 <- 1.5 * exp(-xx)
->   yy <- y1 + y2
->   par(mar = c(0, 0, 3.5, 0))
->   plot(xx, yy, type = "n", axes = FALSE, ylim = c(-0.2,6), xlim = c(0, 5),
-+        xlab = "", ylab = "", main = "Components of the SSbiexp model")
->   usr <- par("usr")
->   lines(xx, y1, lty = 2, lwd = 0.75)
->   lines(xx, y2, lty = 3, lwd = 0.75)
->   lines(xx, yy, lwd = 2)
->   segments(1:5, 0, 1:5, -0.15)
->   segments(0, 1:5, -0.06, 1:5)
->   text(-0.1, 1:5, 1:5, adj = c(1, 0.25), cex = 0.7)
->   text(1:5, -0.15, 1:5, adj = c(0.5, 1), cex = 0.7)
->   arrows(usr[1], 0, usr[2], 0, length = 0.1, angle = 25)
->   arrows(0, usr[3], 0, usr[4], length = 0.1, angle = 25)
->   text(usr[2] - 0.2, 0.1, "x", adj = c(1, 0))
->   text(-0.1, usr[4], "y", adj = c(1, 1))
-> ## End Don't show
+>   plot(xx, y1 + y2, type = "l", lwd=2, ylim = c(-0.2,6), xlim = c(0, 5),
++        main = "Components of the SSbiexp model")
+>   lines(xx, y1, lty = 2, col="tomato"); abline(v=0, h=0, col="gray40")
+>   lines(xx, y2, lty = 3, col="blue2" )
+>   legend("topright", c("y1+y2", "y1 = 3.5 * exp(-4*x)", "y2 = 1.5 * exp(-x)"),
++          lty=1:3, col=c("black","tomato","blue2"), bty="n")
+>   axis(2, pos=0, at = c(3.5, 1.5), labels = c("A1","A2"), las=2)
+> 
+> ## and how you could have got their sum via SSbiexp():
+>   ySS <- SSbiexp(xx, 3.5, log(4), 1.5, log(1))
+>   ##                      ---          ---
+>   stopifnot(all.equal(y1+y2, ySS, tolerance = 1e-15))
 > 
 > 
 > 
-> graphics::par(get("par.postscript", pos = 'CheckExEnv'))
 > cleanEx()
 > nameEx("SSfol")
 > ### * SSfol
@@ -1718,7 +1796,7 @@ Variances:
 > 
 > ### Name: TukeyHSD
 > ### Title: Compute Tukey Honest Significant Differences
-> ### Aliases: TukeyHSD TukeyHSD.aov print.TukeyHSD plot.TukeyHSD
+> ### Aliases: TukeyHSD
 > ### Keywords: models design
 > 
 > ### ** Examples
@@ -1797,7 +1875,7 @@ L-M 10.000000  0.6465793 19.35342 0.0336262
 [1] TRUE
 > ## Cumulative hazard H():
 > all.equal(pweibull(x, 2.5, pi, lower.tail = FALSE, log.p = TRUE),
-+           -(x/pi)^2.5, tol = 1e-15)
++           -(x/pi)^2.5, tolerance = 1e-15)
 [1] TRUE
 > all.equal(qweibull(x/11, shape = 1, scale = pi), qexp(x/11, rate = 1/pi))
 [1] TRUE
@@ -2443,24 +2521,6 @@ Frequency = 1
 > 
 > ### ** Examples
 > 
-> ## From Venables and Ripley (2002) p.165.
-> utils::data(npk, package = "MASS")
-> 
-> op <- options(contrasts = c("contr.helmert", "contr.poly"))
-> npk.aov <- aov(yield ~ block + N*P*K, npk)
-> alias(npk.aov)
-Model :
-yield ~ block + N * P * K
-
-Complete :
-         (Intercept) block1 block2 block3 block4 block5 N1    P1    K1    N1:P1
-N1:P1:K1     0           1    1/3    1/6  -3/10   -1/5      0     0     0     0
-         N1:K1 P1:K1
-N1:P1:K1     0     0
-
-> options(op)  # reset
-> 
-> 
 > 
 > base::options(contrasts = c(unordered = "contr.treatment",ordered = "contr.poly"))
 > cleanEx()
@@ -2471,7 +2531,7 @@ N1:P1:K1     0     0
 > 
 > ### Name: anova.glm
 > ### Title: Analysis of Deviance for Generalized Linear Model Fits
-> ### Aliases: anova.glm anova.glmlist
+> ### Aliases: anova.glm
 > ### Keywords: models regression
 > 
 > ### ** Examples
@@ -2535,7 +2595,8 @@ outcome    2   5.4523         6     5.1291  0.06547 .
 treatment  2   0.0000         4     5.1291  1.00000  
 ---
 Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
-> glm.D93a <- update(glm.D93, ~treatment*outcome) ## equivalent to Pearson Chi-square
+> glm.D93a <-
++    update(glm.D93, ~treatment*outcome) # equivalent to Pearson Chi-square
 > anova(glm.D93, glm.D93a, test = "Rao")
 Analysis of Deviance Table
 
@@ -2621,7 +2682,7 @@ Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’
 > 
 > ### Name: anova.mlm
 > ### Title: Comparisons between Multivariate Linear Models
-> ### Aliases: anova.mlm anova.mlmlist
+> ### Aliases: anova.mlm
 > ### Keywords: regression models multivariate
 > 
 > ### ** Examples
@@ -2893,7 +2954,6 @@ ratio of scales
 > ### ** Examples
 > 
 > ## From Venables and Ripley (2002) p.165.
-> utils::data(npk, package = "MASS")
 > 
 > ## Set orthogonal contrasts.
 > op <- options(contrasts = c("contr.helmert", "contr.poly"))
@@ -3430,7 +3490,7 @@ s.e.  0.1414   0.1702   0.1473     0.0983
 
 sigma^2 estimated as 0.1905:  part log likelihood = -28.31
 > 
-> arima(USAccDeaths, order = c(0,1,1), seasonal = list(order=c(0,1,1)))
+> arima(USAccDeaths, order = c(0,1,1), seasonal = list(order = c(0,1,1)))
 
 Call:
 arima(x = USAccDeaths, order = c(0, 1, 1), seasonal = list(order = c(0, 1, 1)))
@@ -3441,7 +3501,7 @@ Coefficients:
 s.e.   0.1228   0.1784
 
 sigma^2 estimated as 99347:  log likelihood = -425.44,  aic = 856.88
-> arima(USAccDeaths, order = c(0,1,1), seasonal = list(order=c(0,1,1)),
+> arima(USAccDeaths, order = c(0,1,1), seasonal = list(order = c(0,1,1)),
 +       method = "CSS") # drops first 13 observations.
 
 Call:
@@ -3456,7 +3516,7 @@ s.e.   0.1366   0.1436
 sigma^2 estimated as 110330:  part log likelihood = -426.25
 > # for a model with as few years as this, we want full ML
 > 
-> arima(LakeHuron, order = c(2,0,0), xreg = time(LakeHuron)-1920)
+> arima(LakeHuron, order = c(2,0,0), xreg = time(LakeHuron) - 1920)
 
 Call:
 arima(x = LakeHuron, order = c(2, 0, 0), xreg = time(LakeHuron) - 1920)
@@ -3495,6 +3555,17 @@ s.e.  0.0936  0.1140   0.0946     4.2845
 
 sigma^2 estimated as 81.12:  log likelihood = -414.08,  aic = 838.16
 > tsdiag(fit3)
+> 
+> ## An example of ARIMA forecasting:
+> predict(fit3, 3)
+$pred
+         Qtr1     Qtr2     Qtr3
+1975 29.84194 34.41014 39.30815
+
+$se
+         Qtr1     Qtr2     Qtr3
+1975  9.00655 11.25606 13.43389
+
 > 
 > 
 > 
@@ -3683,22 +3754,11 @@ sigma^2 estimated as 0.4566:  log likelihood = -101.2,  aic = 212.4
 > x <- matrix(rnorm(30), ncol = 3)
 > hc <- hclust(dist(x), method = "complete")
 > 
-> if(require("cluster", quietly = TRUE)) {# is a recommended package
-+   ag <- agnes(x, method = "complete")
-+   hcag <- as.hclust(ag)
-+   ## The dendrograms order slightly differently:
-+   op <- par(mfrow = c(1,2))
-+   plot(hc) ;  mtext("hclust", side = 1)
-+   plot(hcag); mtext("agnes",  side = 1)
-+ }
 > 
 > 
 > 
 > graphics::par(get("par.postscript", pos = 'CheckExEnv'))
 > cleanEx()
-
-detaching ‘package:cluster’
-
 > nameEx("asOneSidedFormula")
 > ### * asOneSidedFormula
 > 
@@ -3713,7 +3773,7 @@ detaching ‘package:cluster’
 > 
 > asOneSidedFormula("age")
 ~age
-<environment: 0x45ca580>
+<environment: 0x2a66148>
 > asOneSidedFormula(~ age)
 ~age
 > 
@@ -4253,7 +4313,7 @@ X-squared = 4.3, df = 4, p-value = 0.3669
 > 
 > ### Name: confint
 > ### Title: Confidence Intervals for Model Parameters
-> ### Aliases: confint confint.default
+> ### Aliases: confint confint.default confint.lm
 > ### Keywords: models
 > 
 > ### ** Examples
@@ -4270,25 +4330,6 @@ am          -0.614677730 0.926307310
        2.5 %   97.5 %
 wt 0.3800887 1.622518
 > 
-> ## from example(glm) (needs MASS to be present on the system)
-> counts <- c(18,17,15,20,10,20,25,13,12)
-> outcome <- gl(3, 1, 9); treatment <- gl(3, 3)
-> glm.D93 <- glm(counts ~ outcome + treatment, family = poisson())
-> confint(glm.D93)
-Waiting for profiling to be done...
-                 2.5 %      97.5 %
-(Intercept)  2.6958215  3.36655581
-outcome2    -0.8577018 -0.06255840
-outcome3    -0.6753696  0.08244089
-treatment2  -0.3932548  0.39325483
-treatment3  -0.3932548  0.39325483
-> confint.default(glm.D93)  # based on asymptotic normality
-                 2.5 %      97.5 %
-(Intercept)  2.7095672  3.37947764
-outcome2    -0.8505027 -0.05800787
-outcome3    -0.6707552  0.08478093
-treatment2  -0.3919928  0.39199279
-treatment3  -0.3919928  0.39199279
 > 
 > 
 > 
@@ -4497,25 +4538,6 @@ i    0    0 -0.1498721 -0.8817814
 s    0    0  0.8912491  0.0753323
 t   -1   -1 -0.2471257  0.2688164
 > 
-> ## using sparse contrasts: % useful, once model.matrix() works with these :
-> ffs <- fff
-> contrasts(ffs) <- contr.sum(5, sparse = TRUE)[, 1:2]; contrasts(ffs)
-  [,1] [,2]       [,3]       [,4]
-a    1    0 -0.2471257  0.2688164
-c    0    1 -0.2471257  0.2688164
-i    0    0 -0.1498721 -0.8817814
-s    0    0  0.8912491  0.0753323
-t   -1   -1 -0.2471257  0.2688164
-> stopifnot(all.equal(ffs, fff))
-> contrasts(ffs) <- contr.sum(5, sparse = TRUE); contrasts(ffs)
-5 x 4 sparse Matrix of class "dgCMatrix"
-             
-a  1  .  .  .
-c  .  1  .  .
-i  .  .  1  .
-s  .  .  .  1
-t -1 -1 -1 -1
-> 
 > 
 > 
 > cleanEx()
@@ -4714,7 +4736,7 @@ function (V)
     r[cbind(1L:p, 1L:p)] <- 1
     r
 }
-<bytecode: 0x7542ac8>
+<bytecode: 0x4cb6bd8>
 <environment: namespace:stats>
 > stopifnot(all.equal(Cl, cov2cor(cov(longley))),
 +           all.equal(cor(longley, method = "kendall"),
@@ -5519,8 +5541,8 @@ NULL
 > ### Title: General Tree Structures
 > ### Aliases: dendrogram as.dendrogram as.dendrogram.dendrogram
 > ###   as.dendrogram.hclust as.hclust.dendrogram cut.dendrogram
-> ###   [[.dendrogram merge.dendrogram plot.dendrogram print.dendrogram
-> ###   rev.dendrogram str.dendrogram is.leaf
+> ###   [[.dendrogram merge.dendrogram nobs.dendrogram plot.dendrogram
+> ###   print.dendrogram rev.dendrogram str.dendrogram is.leaf
 > ### Keywords: multivariate tree hplot
 > 
 > ### ** Examples
@@ -5689,6 +5711,101 @@ NULL
         |--leaf "Michigan" 
         '--leaf "Nevada" 
 > 
+> ## to peek at the inner structure "if you must", use '[..]' indexing :
+> str(d3[2][[1]]) ## or the full
+List of 2
+ $ :List of 2
+  ..$ : atomic [1:1] 13
+  .. ..- attr(*, "label")= chr "Illinois"
+  .. ..- attr(*, "members")= int 1
+  .. ..- attr(*, "height")= num 0
+  .. ..- attr(*, "leaf")= logi TRUE
+  ..$ : atomic [1:1] 32
+  .. ..- attr(*, "label")= chr "New York"
+  .. ..- attr(*, "members")= int 1
+  .. ..- attr(*, "height")= num 0
+  .. ..- attr(*, "leaf")= logi TRUE
+  ..- attr(*, "members")= int 2
+  ..- attr(*, "midpoint")= num 0.5
+  ..- attr(*, "height")= num 6.24
+ $ :List of 2
+  ..$ : atomic [1:1] 22
+  .. ..- attr(*, "label")= chr "Michigan"
+  .. ..- attr(*, "members")= int 1
+  .. ..- attr(*, "height")= num 0
+  .. ..- attr(*, "leaf")= logi TRUE
+  ..$ : atomic [1:1] 28
+  .. ..- attr(*, "label")= chr "Nevada"
+  .. ..- attr(*, "members")= int 1
+  .. ..- attr(*, "height")= num 0
+  .. ..- attr(*, "leaf")= logi TRUE
+  ..- attr(*, "members")= int 2
+  ..- attr(*, "midpoint")= num 0.5
+  ..- attr(*, "height")= num 13.3
+ - attr(*, "members")= int 4
+ - attr(*, "midpoint")= num 1.5
+ - attr(*, "height")= num 18.4
+> str(d3[])
+List of 2
+ $ :List of 2
+  ..$ : atomic [1:1] 8
+  .. ..- attr(*, "members")= int 1
+  .. ..- attr(*, "height")= num 0
+  .. ..- attr(*, "label")= chr "Delaware"
+  .. ..- attr(*, "leaf")= logi TRUE
+  ..$ :List of 2
+  .. ..$ : atomic [1:1] 1
+  .. .. ..- attr(*, "label")= chr "Alabama"
+  .. .. ..- attr(*, "members")= int 1
+  .. .. ..- attr(*, "height")= num 0
+  .. .. ..- attr(*, "leaf")= logi TRUE
+  .. ..$ : atomic [1:1] 18
+  .. .. ..- attr(*, "label")= chr "Louisiana"
+  .. .. ..- attr(*, "members")= int 1
+  .. .. ..- attr(*, "height")= num 0
+  .. .. ..- attr(*, "leaf")= logi TRUE
+  .. ..- attr(*, "members")= int 2
+  .. ..- attr(*, "midpoint")= num 0.5
+  .. ..- attr(*, "height")= num 15.5
+  ..- attr(*, "members")= int 3
+  ..- attr(*, "midpoint")= num 0.75
+  ..- attr(*, "height")= num 16.9
+ $ :List of 2
+  ..$ :List of 2
+  .. ..$ : atomic [1:1] 13
+  .. .. ..- attr(*, "label")= chr "Illinois"
+  .. .. ..- attr(*, "members")= int 1
+  .. .. ..- attr(*, "height")= num 0
+  .. .. ..- attr(*, "leaf")= logi TRUE
+  .. ..$ : atomic [1:1] 32
+  .. .. ..- attr(*, "label")= chr "New York"
+  .. .. ..- attr(*, "members")= int 1
+  .. .. ..- attr(*, "height")= num 0
+  .. .. ..- attr(*, "leaf")= logi TRUE
+  .. ..- attr(*, "members")= int 2
+  .. ..- attr(*, "midpoint")= num 0.5
+  .. ..- attr(*, "height")= num 6.24
+  ..$ :List of 2
+  .. ..$ : atomic [1:1] 22
+  .. .. ..- attr(*, "label")= chr "Michigan"
+  .. .. ..- attr(*, "members")= int 1
+  .. .. ..- attr(*, "height")= num 0
+  .. .. ..- attr(*, "leaf")= logi TRUE
+  .. ..$ : atomic [1:1] 28
+  .. .. ..- attr(*, "label")= chr "Nevada"
+  .. .. ..- attr(*, "members")= int 1
+  .. .. ..- attr(*, "height")= num 0
+  .. .. ..- attr(*, "leaf")= logi TRUE
+  .. ..- attr(*, "members")= int 2
+  .. ..- attr(*, "midpoint")= num 0.5
+  .. ..- attr(*, "height")= num 13.3
+  ..- attr(*, "members")= int 4
+  ..- attr(*, "midpoint")= num 1.5
+  ..- attr(*, "height")= num 18.4
+ - attr(*, "members")= int 7
+ - attr(*, "midpoint")= num 2.62
+ - attr(*, "height")= num 26.4
+> 
 > ## merge() to join dendrograms:
 > (d13 <- merge(dend2$lower[[1]], dend2$lower[[3]]))
 'dendrogram' with 2 branches and 16 members total, at height 49.32173 
@@ -5731,7 +5848,7 @@ NULL
 > 
 > ### Name: density
 > ### Title: Kernel Density Estimation
-> ### Aliases: density density.default print.density
+> ### Aliases: density density.default
 > ### Keywords: distribution smooth
 > 
 > ### ** Examples
@@ -6183,7 +6300,6 @@ y 2.4
 > 
 > options(contrasts = c("contr.helmert", "contr.poly"))
 > ## From Venables and Ripley (2002) p.165.
-> utils::data(npk, package = "MASS")
 > npk.aov <- aov(yield ~ block + N*P*K, npk)
 > dummy.coef(npk.aov)
 Full coefficients are 
@@ -6679,7 +6795,7 @@ The degrees of freedom for the model is 0 and the fit was 0.4755
 > ### Name: family
 > ### Title: Family Objects for Models
 > ### Aliases: family binomial gaussian Gamma inverse.gaussian poisson quasi
-> ###   quasibinomial quasipoisson print.family
+> ###   quasibinomial quasipoisson
 > ### Keywords: models
 > 
 > ### ** Examples
@@ -6731,8 +6847,7 @@ List of 12
 > gf$linkinv
 function (eta) 
 1/eta
-<bytecode: 0x49b50a8>
-<environment: 0x9e6a100>
+<environment: namespace:stats>
 > gf$variance(-3:4) #- == (.)^2
 [1]  9  4  1  0  1  4  9 16
 > 
@@ -7133,7 +7248,7 @@ attr(,".Environment")
 > environment(as.formula("y ~ x"))
 <environment: R_GlobalEnv>
 > environment(as.formula("y ~ x", env = new.env()))
-<environment: 0xa03f7b0>
+<environment: 0x490d0a8>
 > 
 > 
 > ## Create a formula for a model with a large number of variables:
@@ -7516,7 +7631,7 @@ Crew  Child        0      0
 > 
 > ### Name: glm
 > ### Title: Fitting Generalized Linear Models
-> ### Aliases: glm glm.fit weights.glm print.glm
+> ### Aliases: glm glm.fit weights.glm
 > ### Keywords: models regression
 > 
 > ### ** Examples
@@ -7552,38 +7667,6 @@ NULL                          8    10.5814
 outcome    2   5.4523         6     5.1291
 treatment  2   0.0000         4     5.1291
 > 
-> ## an example with offsets from Venables & Ripley (2002, p.189)
-> utils::data(anorexia, package = "MASS")
-> 
-> anorex.1 <- glm(Postwt ~ Prewt + Treat + offset(Prewt),
-+                 family = gaussian, data = anorexia)
-> summary(anorex.1)
-
-Call:
-glm(formula = Postwt ~ Prewt + Treat + offset(Prewt), family = gaussian, 
-    data = anorexia)
-
-Deviance Residuals: 
-     Min        1Q    Median        3Q       Max  
--14.1083   -4.2773   -0.5484    5.4838   15.2922  
-
-Coefficients:
-            Estimate Std. Error t value Pr(>|t|)    
-(Intercept)  49.7711    13.3910   3.717 0.000410 ***
-Prewt        -0.5655     0.1612  -3.509 0.000803 ***
-TreatCont    -4.0971     1.8935  -2.164 0.033999 *  
-TreatFT       4.5631     2.1333   2.139 0.036035 *  
----
-Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
-
-(Dispersion parameter for gaussian family taken to be 48.69504)
-
-    Null deviance: 4525.4  on 71  degrees of freedom
-Residual deviance: 3311.3  on 68  degrees of freedom
-AIC: 489.97
-
-Number of Fisher Scoring iterations: 2
-
 > 
 > # A Gamma example, from McCullagh & Nelder (1989, pp. 300-2)
 > clotting <- data.frame(
@@ -7667,18 +7750,20 @@ Number of Fisher Scoring iterations: 3
 > 
 > ### Name: hclust
 > ### Title: Hierarchical Clustering
-> ### Aliases: hclust plot.hclust plclust print.hclust
+> ### Aliases: hclust plot.hclust print.hclust
 > ### Keywords: multivariate cluster
 > 
 > ### ** Examples
 > 
 > require(graphics)
 > 
+> ### Example 1: Violent crime rates by US state
+> 
 > hc <- hclust(dist(USArrests), "ave")
 > plot(hc)
 > plot(hc, hang = -1)
 > 
-> ## Do the same with centroid clustering and squared Euclidean distance,
+> ## Do the same with centroid clustering and *squared* Euclidean distance,
 > ## cut the tree into ten clusters and reconstruct the upper part of the
 > ## tree from the cluster centers.
 > hc <- hclust(dist(USArrests)^2, "cen")
@@ -7873,10 +7958,10 @@ FAMI   -3   87   84   84   96   94   94   94   98   99   99  100
 > 
 > ### Name: influence.measures
 > ### Title: Regression Deletion Diagnostics
-> ### Aliases: influence.measures print.infl summary.infl hat hatvalues
-> ###   hatvalues.lm rstandard rstandard.lm rstandard.glm rstudent
-> ###   rstudent.lm rstudent.glm dfbeta dfbeta.lm dfbetas dfbetas.lm dffits
-> ###   covratio cooks.distance cooks.distance.lm cooks.distance.glm
+> ### Aliases: influence.measures hat hatvalues hatvalues.lm rstandard
+> ###   rstandard.lm rstandard.glm rstudent rstudent.lm rstudent.glm dfbeta
+> ###   dfbeta.lm dfbetas dfbetas.lm dffits covratio cooks.distance
+> ###   cooks.distance.lm cooks.distance.glm
 > ### Keywords: regression
 > 
 > ### ** Examples
@@ -8200,7 +8285,7 @@ Within cluster sum of squares by cluster:
 Available components:
 
 [1] "cluster"      "centers"      "totss"        "withinss"     "tot.withinss"
-[6] "betweenss"    "size"        
+[6] "betweenss"    "size"         "iter"         "ifault"      
 > plot(x, col = cl$cluster)
 > points(cl$centers, col = 1:2, pch = 8, cex = 2)
 > 
@@ -8262,7 +8347,7 @@ Within cluster sum of squares by cluster:
 Available components:
 
 [1] "cluster"      "centers"      "totss"        "withinss"     "tot.withinss"
-[6] "betweenss"    "size"        
+[6] "betweenss"    "size"         "iter"         "ifault"      
 > plot(x, col = cl$cluster)
 > points(cl$centers, col = 1:5, pch = 8)
 > 
@@ -8480,10 +8565,9 @@ alternative hypothesis: the CDF of x lies below that of y
 > 
 > ## Multivariate (but non-stationary! ...)
 > lag.plot(freeny.x, lags = 3)
-> ## Not run: 
-> ##D no lines for long series :
-> ##D lag.plot(sqrt(sunspots), set = c(1:4, 9:12), pch = ".", col = "gold")
-> ## End(Not run)
+> 
+> ## no lines for long series :
+> lag.plot(sqrt(sunspots), set = c(1:4, 9:12), pch = ".", col = "gold")
 > 
 > 
 > 
@@ -8525,7 +8609,7 @@ Coefficients:
 > 
 > ### Name: lm
 > ### Title: Fitting Linear Models
-> ### Aliases: lm print.lm
+> ### Aliases: lm
 > ### Keywords: regression
 > 
 > ### ** Examples
@@ -8654,13 +8738,14 @@ groupCtl groupTrt
 > 
 > ### Name: lm.fit
 > ### Title: Fitter Functions for Linear Models
-> ### Aliases: lm.fit lm.wfit
+> ### Aliases: lm.fit lm.wfit .lm.fit
 > ### Keywords: regression array
 > 
 > ### ** Examples
 > 
 > require(utils)
 > set.seed(129)
+> 
 > n <- 7 ; p <- 2
 > X <- matrix(rnorm(n * p), n, p) # no intercept!
 > y <- rnorm(n)
@@ -8704,7 +8789,15 @@ List of 8
   ..$ rank : int 2
   ..- attr(*, "class")= chr "qr"
  $ df.residual  : int 5
-> 
+> ## Don't show: 
+>   ## These are the same calculations at C level, but a parallel BLAS
+>   ## might not do them the same way twice, and if seems serial MKL does not.
+>   lm.. <- .lm.fit(X,y)
+>   lm.w <- .lm.fit(X*sqrt(w), y*sqrt(w))
+>   id <- function(x, y) all.equal(x, y, tolerance = 1e-15, scale = 1)
+>   stopifnot(id(unname(lm.$coef), lm..$coef),
++ 	    id(unname(lmw$coef), lm.w$coef))
+> ## End Don't show
 > 
 > 
 > 
@@ -8790,7 +8883,7 @@ $df
 > 
 > ### Name: logLik
 > ### Title: Extract Log-Likelihood
-> ### Aliases: logLik print.logLik str.logLik logLik.lm
+> ### Aliases: logLik logLik.lm
 > ### Keywords: models
 > 
 > ### ** Examples
@@ -8818,13 +8911,6 @@ Coefficients:
 'log Lik.' -97.24991 (df=8)
 > logLik(fm1, REML = TRUE)
 'log Lik.' -102.6851 (df=8)
-> 
-> utils::data(Orthodont, package = "nlme")
-> fm1 <- lm(distance ~ Sex * age, Orthodont)
-> logLik(fm1)
-'log Lik.' -239.1209 (df=5)
-> logLik(fm1, REML = TRUE)
-'log Lik.' -241.7796 (df=5)
 > 
 > 
 > 
@@ -9070,9 +9156,6 @@ List of 5
 > 
 > ### ** Examples
 > 
-> ## From Venables and Ripley (2002) p.165.
-> utils::data(npk, package = "MASS")
-> 
 > ## Set orthogonal contrasts.
 > op <- options(contrasts = c("contr.helmert", "contr.poly"))
 > 
@@ -9092,7 +9175,7 @@ resp 1           185.2867
 resp 2             7.8286
 Deg. of Freedom        12
 
-Residual standard error: 3.9294470.8077039
+Residual standard errors: 3.929447 0.8077039
 1 out of 13 effects not estimable
 Estimated effects are balanced
 > summary(npk2.aov)
@@ -9125,7 +9208,7 @@ resp 1           37.00167 306.29333
 resp 2            0.06988   2.88496
 Deg. of Freedom         1         4
 
-Residual standard error: 8.7506190.8492579
+Residual standard errors: 8.750619 0.8492579
 Estimated effects are balanced
 
 Stratum 2: Within
@@ -9140,7 +9223,7 @@ resp 1          185.28667
 resp 2            7.82863
 Deg. of Freedom        12
 
-Residual standard error: 3.9294470.8077039
+Residual standard errors: 3.929447 0.8077039
 Estimated effects are balanced
 > summary(npk2.aovE)
 
@@ -10420,10 +10503,10 @@ Nonlinear regression model
 a b 
 3 2 
  residual sum-of-squares: 0.000524
-> ## Not run: 
-> ##D ## terminates in an error, because convergence cannot be confirmed:
-> ##D nls(y ~ a + b*x, start = list(a = 0.12345, b = 0.54321))
-> ## End(Not run)
+> ## terminates in an error, because convergence cannot be confirmed:
+> try(nls(y ~ a + b*x, start = list(a = 0.12345, b = 0.54321)))
+Error in nls(y ~ a + b * x, start = list(a = 0.12345, b = 0.54321)) : 
+  number of iterations exceeded maximum of 50
 > 
 > ## the nls() internal cheap guess for starting values can be sufficient:
 > 
@@ -10440,106 +10523,6 @@ Consider specifying 'start' or using a selfStart model
 > lines(x, predict(nlmod), col = 2)
 > 
 > 
-> ## The muscle dataset in MASS is from an experiment on muscle
-> ## contraction on 21 animals.  The observed variables are Strip
-> ## (identifier of muscle), Conc (Cacl concentration) and Length
-> ## (resulting length of muscle section).
-> utils::data(muscle, package = "MASS")
-> 
-> ## The non linear model considered is
-> ##       Length = alpha + beta*exp(-Conc/theta) + error
-> ## where theta is constant but alpha and beta may vary with Strip.
-> 
-> with(muscle, table(Strip)) # 2,3 or 4 obs per strip
-Strip
-S01 S02 S03 S04 S05 S06 S07 S08 S09 S10 S11 S12 S13 S14 S15 S16 S17 S18 S19 S20 
-  4   4   4   3   3   3   2   2   2   2   3   2   2   2   2   4   4   3   3   3 
-S21 
-  3 
-> 
-> ## We first use the plinear algorithm to fit an overall model,
-> ## ignoring that alpha and beta might vary with Strip.
-> 
-> musc.1 <- nls(Length ~ cbind(1, exp(-Conc/th)), muscle,
-+               start = list(th = 1), algorithm = "plinear")
-> summary(musc.1)
-
-Formula: Length ~ cbind(1, exp(-Conc/th))
-
-Parameters:
-      Estimate Std. Error t value Pr(>|t|)    
-th       0.608      0.115    5.31  1.9e-06 ***
-.lin1   28.963      1.230   23.55  < 2e-16 ***
-.lin2  -34.227      3.793   -9.02  1.4e-12 ***
----
-Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
-
-Residual standard error: 4.67 on 57 degrees of freedom
-
-> 
-> ## Then we use nls' indexing feature for parameters in non-linear
-> ## models to use the conventional algorithm to fit a model in which
-> ## alpha and beta vary with Strip.  The starting values are provided
-> ## by the previously fitted model.
-> ## Note that with indexed parameters, the starting values must be
-> ## given in a list (with names):
-> b <- coef(musc.1)
-> musc.2 <- nls(Length ~ a[Strip] + b[Strip]*exp(-Conc/th), muscle,
-+               start = list(a = rep(b[2], 21), b = rep(b[3], 21), th = b[1]))
-> summary(musc.2)
-
-Formula: Length ~ a[Strip] + b[Strip] * exp(-Conc/th)
-
-Parameters:
-    Estimate Std. Error t value Pr(>|t|)    
-a1    23.454      0.796   29.46  5.0e-16 ***
-a2    28.302      0.793   35.70  < 2e-16 ***
-a3    30.801      1.716   17.95  1.7e-12 ***
-a4    25.921      3.016    8.60  1.4e-07 ***
-a5    23.201      2.891    8.02  3.5e-07 ***
-a6    20.120      2.435    8.26  2.3e-07 ***
-a7    33.595      1.682   19.98  3.0e-13 ***
-a8    39.053      3.753   10.41  8.6e-09 ***
-a9    32.137      3.318    9.69  2.5e-08 ***
-a10   40.005      3.336   11.99  1.0e-09 ***
-a11   36.190      3.109   11.64  1.6e-09 ***
-a12   36.911      1.839   20.07  2.8e-13 ***
-a13   30.635      1.700   18.02  1.6e-12 ***
-a14   34.312      3.495    9.82  2.0e-08 ***
-a15   38.395      3.375   11.38  2.3e-09 ***
-a16   31.226      0.886   35.26  < 2e-16 ***
-a17   31.230      0.821   38.02  < 2e-16 ***
-a18   19.998      1.011   19.78  3.6e-13 ***
-a19   37.095      1.071   34.65  < 2e-16 ***
-a20   32.594      1.121   29.07  6.2e-16 ***
-a21   30.376      1.057   28.74  7.5e-16 ***
-b1   -27.300      6.873   -3.97  0.00099 ***
-b2   -26.270      6.754   -3.89  0.00118 ** 
-b3   -30.901      2.270  -13.61  1.4e-10 ***
-b4   -32.238      3.810   -8.46  1.7e-07 ***
-b5   -29.941      3.773   -7.94  4.1e-07 ***
-b6   -20.622      3.647   -5.65  2.9e-05 ***
-b7   -19.625      8.085   -2.43  0.02661 *  
-b8   -45.780      4.113  -11.13  3.2e-09 ***
-b9   -31.345      6.352   -4.93  0.00013 ***
-b10  -38.599      3.955   -9.76  2.2e-08 ***
-b11  -33.921      3.839   -8.84  9.2e-08 ***
-b12  -38.268      8.992   -4.26  0.00053 ***
-b13  -22.568      8.194   -2.75  0.01355 *  
-b14  -36.167      6.358   -5.69  2.7e-05 ***
-b15  -32.952      6.354   -5.19  7.4e-05 ***
-b16  -47.207      9.540   -4.95  0.00012 ***
-b17  -33.875      7.688   -4.41  0.00039 ***
-b18  -15.896      6.222   -2.55  0.02051 *  
-b19  -28.969      7.235   -4.00  0.00092 ***
-b20  -36.917      8.033   -4.60  0.00026 ***
-b21  -26.508      7.012   -3.78  0.00149 ** 
-th     0.797      0.127    6.30  8.0e-06 ***
----
-Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
-
-Residual standard error: 1.11 on 17 degrees of freedom
-
 > ## Don't show: 
 > options(od)
 > ## End Don't show
@@ -11361,7 +11344,7 @@ Warning in xy.coords(x, y, xlabel, ylabel, log) :
 > 
 > ### Name: plot.lm
 > ### Title: Plot Diagnostics for an lm Object
-> ### Aliases: plot.lm plot.mlm
+> ### Aliases: plot.lm
 > ### Keywords: hplot regression
 > 
 > ### ** Examples
@@ -11533,13 +11516,8 @@ Warning in xy.coords(x, y, xlabel, ylabel, log) :
 > plot(z, plot.type = "single", lty = 1:3, col = 4:2)
 > 
 > ## A phase plot:
-> plot(nhtemp, c(nhtemp[-1], NA), cex = .8, col = "blue",
+> plot(nhtemp, lag(nhtemp, 1), cex = .8, col = "blue",
 +      main = "Lag plot of New Haven temperatures")
-> ## a clearer way to do this would be
-> ## Not run: 
-> ##D plot(nhtemp, lag(nhtemp, 1), cex = .8, col = "blue",
-> ##D      main = "Lag plot of New Haven temperatures")
-> ## End(Not run)
 > 
 > ## xy.lines and xy.labels are FALSE for large series:
 > plot(lag(sunspots, 1), sunspots, pch = ".")
@@ -11709,26 +11687,22 @@ attr(,"degree")
 $linkfun
 function (mu) 
 mu
-<bytecode: 0x49b2298>
-<environment: 0x97631a8>
+<environment: namespace:stats>
 
 $linkinv
 function (eta) 
 eta
-<bytecode: 0x49b2228>
-<environment: 0x97631a8>
+<environment: namespace:stats>
 
 $mu.eta
 function (eta) 
 rep.int(1, length(eta))
-<bytecode: 0x49b21b8>
-<environment: 0x97631a8>
+<environment: namespace:stats>
 
 $valideta
 function (eta) 
 TRUE
-<bytecode: 0x49b1ff8>
-<environment: 0x97631a8>
+<environment: namespace:stats>
 
 $name
 [1] "identity"
@@ -11739,14 +11713,14 @@ attr(,"class")
 $linkfun
 function (mu) 
 mu^lambda
-<bytecode: 0x9b36060>
-<environment: 0x9cff078>
+<bytecode: 0x4b45d80>
+<environment: 0x4b234d8>
 
 $linkinv
 function (eta) 
 pmax(eta^(1/lambda), .Machine$double.eps)
-<bytecode: 0x9ae7638>
-<environment: 0x9cff078>
+<bytecode: 0x4b45c68>
+<environment: 0x4b234d8>
 
 > 
 > 
@@ -12185,18 +12159,10 @@ predict.bs :
 	 function (object, newx, ...)  NULL 
 predict.glm :
 	 function (object, newdata = NULL, type = c("link", "response",      "terms"), se.fit = FALSE, dispersion = NULL, terms = NULL,      na.action = na.pass, ...)  NULL 
-predict.glmmPQL :
-	 function (object, newdata = NULL, type = c("link", "response"),      level = Q, na.action = na.pass, ...)  NULL 
-predict.lda :
-	 function (object, newdata, prior = object$prior, dimen, method = c("plug-in",      "predictive", "debiased"), ...)  NULL 
 predict.lm :
 	 function (object, newdata, se.fit = FALSE, scale = NULL, df = Inf,      interval = c("none", "confidence", "prediction"), level = 0.95,      type = c("response", "terms"), terms = NULL, na.action = na.pass,      pred.var = res.var/weights, weights = 1, ...)  NULL 
 predict.loess :
 	 function (object, newdata = NULL, se = FALSE, na.action = na.pass,      ...)  NULL 
-predict.lqs :
-	 function (object, newdata, na.action = na.pass, ...)  NULL 
-predict.mca :
-	 function (object, newdata, type = c("row", "factor"), ...)  NULL 
 predict.mlm :
 	 function (object, newdata, se.fit = FALSE, na.action = na.pass,      ...)  NULL 
 predict.nbSpline :
@@ -12209,8 +12175,6 @@ predict.ns :
 	 function (object, newx, ...)  NULL 
 predict.pbSpline :
 	 function (object, x, nseg = 50, deriv = 0, ...)  NULL 
-predict.polr :
-	 function (object, newdata, type = c("class", "probs"), ...)  NULL 
 predict.poly :
 	 function (object, newdata, ...)  NULL 
 predict.polySpline :
@@ -12223,10 +12187,6 @@ predict.prcomp :
 	 function (object, newdata, ...)  NULL 
 predict.princomp :
 	 function (object, newdata, ...)  NULL 
-predict.qda :
-	 function (object, newdata, prior = object$prior, method = c("plug-in",      "predictive", "debiased", "looCV"), ...)  NULL 
-predict.rlm :
-	 function (object, newdata = NULL, scale = NULL, ...)  NULL 
 predict.smooth.spline :
 	 function (object, x, deriv = 0, ...)  NULL 
 predict.smooth.spline.fit :
@@ -12363,7 +12323,7 @@ Number of Fisher Scoring iterations: 4
 > 
 > ### Name: predict.lm
 > ### Title: Predict method for Linear Model Fits
-> ### Aliases: predict.lm predict.mlm
+> ### Aliases: predict.lm
 > ### Keywords: regression
 > 
 > ### ** Examples
@@ -12505,7 +12465,6 @@ Warning in predict.lm(wfit, new, interval = "prediction") :
 13  3.58282936  2.2662384  4.89942029
 > 
 > ##-- From  aov(.) example ---- predict(.. terms)
-> utils::data(npk, package = "MASS")
 > npk.aov <- aov(yield ~ block + N*P*K, npk)
 > (termL <- attr(terms(npk.aov), "term.labels"))
 [1] "block" "N"     "P"     "K"     "N:P"   "N:K"   "P:K"   "N:P:K"
@@ -12539,7 +12498,7 @@ attr(,"constant")
 [1] 54.875
 > pt. <- predict(npk.aov, type = "terms", terms = termL[1:4])
 > stopifnot(all.equal(pt[,1:4], pt.,
-+                     check.attr = FALSE, tol = 1e-12))
++                     tolerance = 1e-12, check.attributes = FALSE))
 > 
 > 
 > 
@@ -12963,7 +12922,7 @@ Importance of components:
 Standard deviation     1.5748783 0.9948694 0.5971291 0.41644938
 Proportion of Variance 0.6200604 0.2474413 0.0891408 0.04335752
 Cumulative Proportion  0.6200604 0.8675017 0.9566425 1.00000000
-> loadings(pc.cr)  ## note that blank entries are small but not zero
+> loadings(pc.cr)  # note that blank entries are small but not zero
 
 Loadings:
          Comp.1 Comp.2 Comp.3 Comp.4
@@ -12976,6 +12935,7 @@ Rape     -0.543 -0.167  0.818
 SS loadings      1.00   1.00   1.00   1.00
 Proportion Var   0.25   0.25   0.25   0.25
 Cumulative Var   0.25   0.50   0.75   1.00
+> ## The signs of the columns are arbitrary
 > plot(pc.cr) # shows a screeplot.
 > biplot(pc.cr)
 > 
@@ -13006,17 +12966,6 @@ Standard deviations:
 13.596589  4.676077  2.617533  1.366320 
 
  4  variables and  21 observations.
-> ## Robust:
-> (pc.rob <- princomp(stackloss, covmat = MASS::cov.rob(stackloss)))
-Call:
-princomp(x = stackloss, covmat = MASS::cov.rob(stackloss))
-
-Standard deviations:
-   Comp.1    Comp.2    Comp.3    Comp.4 
-7.8322873 4.0077676 1.9114016 0.7624211 
-
- 4  variables and  21 observations.
-> 
 > 
 > 
 > cleanEx()
@@ -13026,8 +12975,8 @@ Standard deviations:
 > flush(stderr()); flush(stdout())
 > 
 > ### Name: print.ts
-> ### Title: Printing Time-Series Objects
-> ### Aliases: print.ts
+> ### Title: Printing and Formatting of Time-Series Objects
+> ### Aliases: .preformat.ts print.ts
 > ### Keywords: ts
 > 
 > ### ** Examples
@@ -13036,6 +12985,18 @@ Standard deviations:
    p1 p2 p3 p4 p5 p6 p7
 12     1  2  3  4  5  6
 13  7  8  9 10         
+> 
+> print(sunsp.1 <- window(sunspot.month, end=c(1756, 12)))
+       Jan   Feb   Mar   Apr   May   Jun   Jul   Aug   Sep   Oct   Nov   Dec
+1749  58.0  62.6  70.0  55.7  85.0  83.5  94.8  66.3  75.9  75.5 158.6  85.2
+1750  73.3  75.9  89.2  88.3  90.0 100.0  85.4 103.0  91.2  65.7  63.3  75.4
+1751  70.0  43.5  45.3  56.4  60.7  50.7  66.3  59.8  23.5  23.2  28.5  44.0
+1752  35.0  50.0  71.0  59.3  59.7  39.6  78.4  29.3  27.1  46.6  37.6  40.0
+1753  44.0  32.0  45.7  38.0  36.0  31.7  22.0  39.0  28.0  25.0  20.0   6.7
+1754   0.0   3.0   1.7  13.7  20.7  26.7  18.8  12.3   8.2  24.1  13.2   4.2
+1755  10.2  11.2   6.8   6.5   0.0   0.0   8.6   3.2  17.8  23.7   6.8  20.0
+1756  12.5   7.1   5.4   9.4  12.5  12.9   3.6   6.4  11.8  14.3  17.0   9.4
+> m <- .preformat.ts(sunsp.1) # a character matrix
 > 
 > 
 > 
@@ -13698,12 +13659,12 @@ Quade F = 3.8293, num df = 4, denom df = 24, p-value = 0.01519
 > dim(R)  #  10 10  1000
 [1]   10   10 1000
 > mR <- apply(R, 1:2, mean)  # ~= E[ Wish(S, 20) ] = 20 * S
-> stopifnot(all.equal(mR, 20*S, tol = .009))
+> stopifnot(all.equal(mR, 20*S, tolerance = .009))
 > 
 > ## See Details, the variance is
 > Va <- 20*(S^2 + tcrossprod(diag(S)))
 > vR <- apply(R, 1:2, var)
-> stopifnot(all.equal(vR, Va, tol = 1/16))
+> stopifnot(all.equal(vR, Va, tolerance = 1/16))
 > 
 > 
 > 
@@ -13811,11 +13772,12 @@ Female 1st             0     4     1   140
 >  stopifnot(dim(format(ft)) == 4:5,
 + 	   dim(format(ftable(UCBAdmissions))) == c(6,9))
 >  meths <- c("non.compact", "row.compact", "col.compact", "compact")
->  dimform <- function(ft) sapply(meths, function(M) dim(format(ft, method=M)))
->  m.eq    <- function(M,m) all.equal(unname(M), m, tol=0)
+>  dimform <-
++     function(ft) sapply(meths, function(M) dim(format(ft, method = M)))
+>  m.eq    <- function(M,m) all.equal(unname(M), m, tolerance = 0)
 >  ## All format(..) w/o warnings:
 >  stopifnot(m.eq(print(dimform(ft22)),
-+ 		rbind(11:10, rep(7:6, each=2))),
++ 		rbind(11:10, rep(7:6, each = 2))),
 + 	   m.eq(print(dimform(ftable(Titanic, row.vars = integer()))),
 + 		rbind(rep(6:5,2), 33)))
      non.compact row.compact col.compact compact
@@ -14752,12 +14714,6 @@ eff.vl> options(contrasts = old)
 > se.contrast(fit, as.matrix(cont))
        A       BC 
 3.377196 3.899650 
-> ## Not run: 
-> ##D # comparison with lme
-> ##D library(nlme)
-> ##D fit2 <- lme(Yield ~ A + B*C, random = ~1 | Block, data = aovdat)
-> ##D summary(fit2)$tTable # same estimates, similar (but smaller) se's.
-> ## End(Not run)
 > 
 > 
 > base::options(contrasts = c(unordered = "contr.treatment",ordered = "contr.poly"))
@@ -15033,7 +14989,7 @@ S Tukey smoother resulting from  smooth(x = x3R, kind = "S")
 > 
 > ### Name: smooth.spline
 > ### Title: Fit a Smoothing Spline
-> ### Aliases: smooth.spline
+> ### Aliases: smooth.spline .nknots.smspl
 > ### Keywords: smooth
 > 
 > ### ** Examples
@@ -15122,6 +15078,20 @@ attr(,"class")
 > stopifnot(all.equal(cars$dist,
 +                     fitted(cars.spl) + residuals(cars.spl)))
 > 
+> ## Visualize the behavior of  .nknots.smspl()
+> nKnots <- Vectorize(.nknots.smspl) ; c.. <- adjustcolor("gray20",.5)
+> curve(nKnots, 1, 250, n=250)
+> abline(0,1, lty=2, col=c..); text(90,90,"y = x", col=c.., adj=-.25)
+> abline(h=100,lty=2); abline(v=200, lty=2)
+> 
+> n <- c(1:799, seq(800, 3490, by=10), seq(3500, 10000, by = 50))
+> plot(n, nKnots(n), type="l", main = "Vectorize(.nknots.smspl) (n)")
+> abline(0,1, lty=2, col=c..); text(180,180,"y = x", col=c..)
+> n0 <- c(50, 200, 800, 3200); c0 <- adjustcolor("blue3", .5)
+> lines(n0, nKnots(n0), type="h", col=c0)
+> axis(1, at=n0, line=-2, col.ticks=c0, col=NA, col.axis=c0)
+> axis(4, at=.nknots.smspl(10000), line=-.5, col=c..,col.axis=c.., las=1)
+> 
 > ##-- artificial example
 > y18 <- c(1:3, 5, 4, 7:3, 2*(2:5), rep(10, 4))
 > xx  <- seq(1, length(y18), len = 201)
@@ -15154,7 +15124,7 @@ Penalized Criterion: 0.4973656
 > 
 > ## Don't show: 
 > stopifnot(all.equal(predict(s02, xx),
-+ 		    predict(s02., xx), tol = 1e-15))
++ 		    predict(s02., xx), tolerance = 1e-15))
 > ## End Don't show
 > 
 > 
@@ -15540,8 +15510,8 @@ Step function with continuity 'f'= 0.2 ,  3 knots at
 > unclass(sfun0)
 function (v) 
 .approxfun(x, y, v, method, yleft, yright, f)
-<bytecode: 0x4486820>
-<environment: 0x9b6c3f0>
+<bytecode: 0x1a2b948>
+<environment: 0x517d1a8>
 attr(,"call")
 stepfun(1:3, y0, f = 0)
 > ls(envir = environment(sfun0))
@@ -15851,6 +15821,7 @@ Importance of components:
 Standard deviation     1.5748783 0.9948694 0.5971291 0.41644938
 Proportion of Variance 0.6200604 0.2474413 0.0891408 0.04335752
 Cumulative Proportion  0.6200604 0.8675017 0.9566425 1.00000000
+> ## The signs of the loading columns are arbitrary
 > print(summary(princomp(USArrests, cor = TRUE),
 +               loadings = TRUE, cutoff = 0.2), digits = 2)
 Importance of components:
@@ -16297,10 +16268,23 @@ Loading required package: splines
 > termplot(model, partial.resid = TRUE, smooth = panel.smooth, span.smth = 1/4)
 > if(!had.splines && rs) detach("package:splines")
 > 
+> if (require(MASS)) {
++     hills.lm <- lm(log(time) ~ log(climb)+log(dist), data=hills)
++     termplot(hills.lm, partial.resid = TRUE, smooth = panel.smooth,
++              terms = "log(dist)", main = "Original")
++     termplot(hills.lm, transform.x = TRUE, partial.resid = TRUE,
++ 	     terms = "log(dist)", main = "Transformed",
++ 	     smooth=panel.smooth)
++ }
+Loading required package: MASS
+> 
 > 
 > 
 > graphics::par(get("par.postscript", pos = 'CheckExEnv'))
 > cleanEx()
+
+detaching ‘package:MASS’
+
 > nameEx("terms.object")
 > ### * terms.object
 > 
@@ -16497,13 +16481,9 @@ attr(,".Environment")
 > plot(z, plot.type = "single", lty = 1:3)
 > 
 > ## A phase plot:
-> plot(nhtemp, c(nhtemp[-1], NA), cex = .8, col = "blue",
+> plot(nhtemp, lag(nhtemp, 1), cex = .8, col = "blue",
 +      main = "Lag plot of New Haven temperatures")
-> ## a clearer way to do this would be
-> ## Not run: 
-> ##D plot(nhtemp, lag(nhtemp, 1), cex = .8, col = "blue",
-> ##D      main = "Lag plot of New Haven temperatures")
-> ## End(Not run)
+> 
 > 
 > 
 > cleanEx()
@@ -16885,17 +16865,6 @@ Frequency = 1
 > 
 > ### ** Examples
 > 
-> ## Not run: 
-> ##D require(graphics)
-> ##D 
-> ##D fit <- arima(lh, c(1,0,0))
-> ##D tsdiag(fit)
-> ##D 
-> ##D ## see also examples(arima)
-> ##D 
-> ##D (fit <- StructTS(log10(JohnsonJohnson), type = "BSM"))
-> ##D tsdiag(fit)
-> ## End(Not run)
 > 
 > 
 > cleanEx()
@@ -16910,6 +16879,101 @@ Frequency = 1
 > ### Keywords: optimize
 > 
 > ### ** Examples
+> 
+> ##--- uniroot() with new interval extension + checking features: --------------
+> 
+> f1 <- function(x) (121 - x^2)/(x^2+1)
+> f2 <- function(x) exp(-x)*(x - 12)
+> 
+> try(uniroot(f1, c(0,10)))
+Error in uniroot(f1, c(0, 10)) : 
+  f() values at end points not of opposite sign
+> try(uniroot(f2, c(0, 2)))
+Error in uniroot(f2, c(0, 2)) : 
+  f() values at end points not of opposite sign
+> ##--> error: f() .. end points not of opposite sign
+> 
+> ## where as  'extendInt="yes"'  simply first enlarges the search interval:
+> u1 <- uniroot(f1, c(0,10),extendInt="yes", trace=1)
+search in [0,10] ... extended to [-1.5e-05, 11.5] in 4 steps
+> u2 <- uniroot(f2, c(0,2), extendInt="yes", trace=2)
+search in [0,2]
+ .. modified lower,upper: (         -1e-06,           2.02)
+ .. modified lower,upper: (         -3e-06,           2.06)
+ .. modified lower,upper: (         -7e-06,           2.14)
+ .. modified lower,upper: (       -1.5e-05,            2.3)
+ .. modified lower,upper: (       -3.1e-05,           2.62)
+ .. modified lower,upper: (       -6.3e-05,           3.26)
+ .. modified lower,upper: (      -0.000127,           4.54)
+ .. modified lower,upper: (      -0.000255,            7.1)
+ .. modified lower,upper: (      -0.000511,          12.22)
+> stopifnot(all.equal(u1$root, 11, tolerance = 1e-5),
++           all.equal(u2$root, 12, tolerance = 6e-6))
+> 
+> ## The *danger* of interval extension:
+> ## No way to find a zero of a positive function, but
+> ## numerically, f(-|M|) becomes zero :
+> u3 <- uniroot(exp, c(0,2), extendInt="yes", trace=TRUE)
+search in [0,2] ... extended to [-1073.74, 2.14748e+07] in 30 steps
+> 
+> ## Nonsense example (must give an error):
+> tools::assertCondition( uniroot(function(x) 1, 0:1, extendInt="yes"),
++                        "error", verbose=TRUE)
+assertCondition: caught “error”
+> 
+> ## Convergence checking :
+> sinc <- function(x) ifelse(x == 0, 1, sin(x)/x)
+> curve(sinc, -6,18); abline(h=0,v=0, lty=3, col=adjustcolor("gray", 0.8))
+> ## Don't show: 
+> tools::assertWarning(
++ ## End Don't show
++ uniroot(sinc, c(0,5), extendInt="yes", maxiter=4) #-> "just" a warning
++ ## Don't show: 
++  , verbose=TRUE)
+Asserted warning: _NOT_ converged in 4 iterations
+> ## End Don't show
+> 
+> ## now with  check.conv=TRUE, must signal a convergence error :
+> ## Don't show: 
+> tools::assertError(
++ ## End Don't show
++ uniroot(sinc, c(0,5), extendInt="yes", maxiter=4, check.conv=TRUE)
++ ## Don't show: 
++  , verbose=TRUE)
+Asserted error: _NOT_ converged in 4 iterations
+> ## End Don't show
+> 
+> ### Weibull cumulative hazard (example origin, Ravi Varadhan):
+> cumhaz <- function(t, a, b) b * (t/b)^a
+> froot <- function(x, u, a, b) cumhaz(x, a, b) - u
+> 
+> n <- 1000
+> u <- -log(runif(n))
+> a <- 1/2
+> b <- 1
+> ## Find failure times
+> ru <- sapply(u, function(x)
++    uniroot(froot, u=x, a=a, b=b, interval= c(1.e-14, 1e04),
++            extendInt="yes")$root)
+> ru2 <- sapply(u, function(x)
++    uniroot(froot, u=x, a=a, b=b, interval= c(0.01,  10),
++            extendInt="yes")$root)
+> stopifnot(all.equal(ru, ru2, tolerance = 6e-6))
+> 
+> r1 <- uniroot(froot, u= 0.99, a=a, b=b, interval= c(0.01, 10),
++              extendInt="up")
+> stopifnot(all.equal(0.99, cumhaz(r1$root, a=a, b=b)))
+> 
+> ## An error if 'extendInt' assumes "wrong zero-crossing direction":
+> ## Don't show: 
+> tools::assertError(
++ ## End Don't show
++ uniroot(froot, u= 0.99, a=a, b=b, interval= c(0.1, 10), extendInt="down")
++ ## Don't show: 
++  , verbose=TRUE)
+Asserted error: no sign change found in 1000 iterations
+> ## End Don't show
+> 
 > 
 > 
 > cleanEx()
@@ -17635,68 +17699,10 @@ B    L                 27 14 29 19 29 31 41 20 44
 > 
 > ### ---- Sparse Examples ----
 > 
-> if(require("Matrix")) {
-+  ## similar to "nlme"s  'ergoStool' :
-+  d.ergo <- data.frame(Type = paste0("T", rep(1:4, 9*4)),
-+                       Subj = gl(9, 4, 36*4))
-+  print(xtabs(~ Type + Subj, data = d.ergo)) # 4 replicates each
-+  set.seed(15) # a subset of cases:
-+  print(xtabs(~ Type + Subj, data = d.ergo[sample(36, 10), ], sparse = TRUE))
-+ 
-+  ## Hypothetical two level setup:
-+  inner <- factor(sample(letters[1:25], 100, replace = TRUE))
-+  inout <- factor(sample(LETTERS[1:5], 25, replace = TRUE))
-+  fr <- data.frame(inner = inner, outer = inout[as.integer(inner)])
-+  print(xtabs(~ inner + outer, fr, sparse = TRUE))
-+ }
-Loading required package: Matrix
-Loading required package: lattice
-    Subj
-Type 1 2 3 4 5 6 7 8 9
-  T1 4 4 4 4 4 4 4 4 4
-  T2 4 4 4 4 4 4 4 4 4
-  T3 4 4 4 4 4 4 4 4 4
-  T4 4 4 4 4 4 4 4 4 4
-4 x 9 sparse Matrix of class "dgCMatrix"
-   1 2 3 4 5 6 7 8 9
-T1 . 1 . 1 . 1 . 1 .
-T2 1 . . . . . 1 . 1
-T3 . . . . 1 . . . .
-T4 1 . . . . . 1 . .
-25 x 5 sparse Matrix of class "dgCMatrix"
-  A B C D E
-a 2 . . . .
-b . . 1 . .
-c . 6 . . .
-d . . . 5 .
-e . . . 3 .
-f 1 . . . .
-g . 9 . . .
-h . . 3 . .
-i . . . . 5
-j . . . 1 .
-k 3 . . . .
-l . 2 . . .
-m 6 . . . .
-n . . 1 . .
-o 2 . . . .
-p . . 2 . .
-q . 5 . . .
-r . . . . 6
-s . . 4 . .
-t . . . 7 .
-u . 4 . . .
-v . . . 7 .
-w . . . 7 .
-x . . . . 6
-y . . . . 2
 > 
 > 
 > 
 > cleanEx()
-
-detaching ‘package:Matrix’, ‘package:lattice’
-
 > nameEx("zC")
 > ### * zC
 > 
@@ -17793,7 +17799,7 @@ Number of Fisher Scoring iterations: 6
 > ###
 > options(digits = 7L)
 > base::cat("Time elapsed: ", proc.time() - base::get("ptime", pos = 'CheckExEnv'),"\n")
-Time elapsed:  14.992 0.275 15.886 0 0 
+Time elapsed:  5.017 0.132 5.174 0 0 
 > grDevices::dev.off()
 null device 
           1 

@@ -1,7 +1,7 @@
 #  File src/library/grDevices/R/device.R
 #  Part of the R package, http://www.R-project.org
 #
-#  Copyright (C) 1995-2012 The R Core Team
+#  Copyright (C) 1995-2014 The R Core Team
 #
 #  This program is free software; you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
@@ -136,7 +136,7 @@ dev.print <- function(device = postscript, ...)
     if(!dev.displaylist())
         stop("can only print from a screen device")
     oc <- match.call()
-    oc[[1L]] <- as.name("dev.copy")
+    oc[[1L]] <- quote(grDevices::dev.copy)
     oc$device <- device
     din <- graphics::par("din"); w <- din[1L]; h <- din[2L]
     if(missing(device)) { ## safe way to recognize postscript
@@ -196,7 +196,7 @@ dev.copy2eps <- function(...)
     if(!dev.displaylist())
         stop("can only print from a screen device")
     oc <- match.call()
-    oc[[1L]] <- as.name("dev.copy")
+    oc[[1L]] <- quote(grDevices::dev.copy)
     oc$device <- postscript
     oc$onefile <- FALSE
     oc$horizontal <- FALSE
@@ -222,7 +222,7 @@ dev.copy2pdf <- function(..., out.type = "pdf")
     if(!dev.displaylist())
         stop("can only print from a screen device")
     oc <- match.call()
-    oc[[1L]] <- as.name("dev.copy")
+    oc[[1L]] <- quote(grDevices::dev.copy)
     if(out.type == "quartz" && capabilities("aqua")) {
         oc$device <- quartz
         oc$type <- "pdf"
@@ -276,11 +276,27 @@ graphics.off <- function ()
     invisible()
 }
 
-dev.new <- function(...)
+dev.new <- function(..., noRStudioGD = FALSE)
 {
     dev <- getOption("device")
     if(!is.character(dev) && !is.function(dev))
         stop("invalid setting for 'getOption(\"device\")'")
+    if(is.character(dev) && noRStudioGD && dev == "RStudioGD") {
+        ## copied from zzz.R
+        if(!nzchar(defdev <- Sys.getenv("R_DEFAULT_DEVICE"))) defdev <- pdf
+        dev <- if(interactive()) {
+            if(nzchar(intdev <- Sys.getenv("R_INTERACTIVE_DEVICE"))) intdev
+            else {
+                dsp <- Sys.getenv("DISPLAY")
+                if(.Platform$OS.type == "windows") windows
+                else if (.Platform$GUI == "AQUA" ||
+                         ((!nzchar(dsp) || grepl("^/tmp/launch-", dsp))
+                          && .Call(C_makeQuartzDefault))) quartz
+                else if (nzchar(dsp) && .Platform$GUI %in% c("X11", "Tk")) X11
+                else defdev
+            }
+        } else defdev
+    }
     if(is.character(dev)) {
         ## this is documented to be searched for from workspace,
         ## then in graphics namespace.

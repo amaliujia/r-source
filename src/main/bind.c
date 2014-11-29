@@ -1,7 +1,7 @@
 /*
  *  R : A Computer Language for Statistical Data Analysis
  *  Copyright (C) 1995, 1996  Robert Gentleman and Ross Ihaka
- *  Copyright (C) 1997--2012  The R Core Team
+ *  Copyright (C) 1997--2014  The R Core Team
  *  Copyright (C) 2002--2005  The R Foundation
  *
  *  This program is free software; you can redistribute it and/or modify
@@ -96,11 +96,19 @@ AnswerType(SEXP x, int recurse, int usenames, struct BindData *data, SEXP call)
 	data->ans_flags |= 128;
 	data->ans_length += XLENGTH(x);
 	break;
+
+#ifdef DO_C_Symbol
+/* new case : */
+    case SYMSXP:
+    case LANGSXP:
+	data->ans_flags |= 512; /* as.expression() implicitly */
+	data->ans_length += 1;
+	break;
+#endif
     case VECSXP:
     case EXPRSXP:
 	if (recurse) {
-	    R_xlen_t i, n;
-	    n = xlength(x);
+	    R_xlen_t i, n = xlength(x);
 	    if (usenames && !data->ans_nnames &&
 		!isNull(getAttrib(x, R_NamesSymbol)))
 		data->ans_nnames = 1;
@@ -155,8 +163,8 @@ AnswerType(SEXP x, int recurse, int usenames, struct BindData *data, SEXP call)
 }
 
 
-/* The following functions are used to coerce arguments to */
-/* the appropriate type for inclusion in the returned value. */
+/* The following functions are used to coerce arguments to the
+ * appropriate type for inclusion in the returned value. */
 
 static void
 ListAnswer(SEXP x, int recurse, struct BindData *data, SEXP call)
@@ -198,7 +206,7 @@ ListAnswer(SEXP x, int recurse, struct BindData *data, SEXP call)
 	}
 	else {
 	    for (i = 0; i < XLENGTH(x); i++)
-		LIST_ASSIGN(duplicate(VECTOR_ELT(x, i)));
+		LIST_ASSIGN(lazy_duplicate(VECTOR_ELT(x, i)));
 	}
 	break;
     case LISTSXP:
@@ -210,12 +218,12 @@ ListAnswer(SEXP x, int recurse, struct BindData *data, SEXP call)
 	}
 	else
 	    while (x != R_NilValue) {
-		LIST_ASSIGN(duplicate(CAR(x)));
+		LIST_ASSIGN(lazy_duplicate(CAR(x)));
 		x = CDR(x);
 	    }
 	break;
     default:
-	LIST_ASSIGN(duplicate(x));
+	LIST_ASSIGN(lazy_duplicate(x));
 	break;
     }
 }
@@ -270,12 +278,14 @@ LogicalAnswer(SEXP x, struct BindData *data, SEXP call)
 	    LOGICAL(data->ans_ptr)[data->ans_length++] = LOGICAL(x)[i];
 	break;
     case INTSXP:
-	for (i = 0; i < XLENGTH(x); i++)
-	    LOGICAL(data->ans_ptr)[data->ans_length++] = INTEGER(x)[i];
+	for (i = 0; i < XLENGTH(x); i++) {
+	    int v = INTEGER(x)[i];
+	    LOGICAL(data->ans_ptr)[data->ans_length++] = (v == NA_INTEGER) ? NA_LOGICAL : ( v != 0 );
+	}
 	break;
     case RAWSXP:
 	for (i = 0; i < XLENGTH(x); i++)
-	    LOGICAL(data->ans_ptr)[data->ans_length++] = (int)RAW(x)[i];
+	    LOGICAL(data->ans_ptr)[data->ans_length++] = (int)RAW(x)[i] != 0;
 	break;
     default:
 	errorcall(call, _("type '%s' is unimplemented in '%s'"),
@@ -371,7 +381,7 @@ RealAnswer(SEXP x, struct BindData *data, SEXP call)
 static void
 ComplexAnswer(SEXP x, struct BindData *data, SEXP call)
 {
-    R_xlen_t i; 
+    R_xlen_t i;
     int xi;
     switch(TYPEOF(x)) {
     case NILSXP:
@@ -476,12 +486,14 @@ static SEXP NewBase(SEXP base, SEXP tag)
     base = EnsureString(base);
     tag = EnsureString(tag);
     if (*CHAR(base) && *CHAR(tag)) { /* test of length */
+	const void *vmax = vmaxget();
 	const char *sb = translateCharUTF8(base), *st = translateCharUTF8(tag);
 	cbuf = R_AllocStringBuffer(strlen(st) + strlen(sb) + 1, &cbuff);
 	sprintf(cbuf, "%s.%s", sb, st);
 	/* This isn't strictly correct as we do not know that all the
 	   components of the name were correctly translated. */
 	ans = mkCharCE(cbuf, CE_UTF8);
+	vmaxset(vmax);
     }
     else if (*CHAR(tag)) {
 	ans = tag;
@@ -504,6 +516,8 @@ static SEXP NewName(SEXP base, SEXP tag, int seqno)
 
     SEXP ans;
     char *cbuf;
+    const void *vmax = vmaxget();
+
     base = EnsureString(base);
     tag = EnsureString(tag);
     if (*CHAR(base) && *CHAR(tag)) {
@@ -529,6 +543,7 @@ static SEXP NewName(SEXP base, SEXP tag, int seqno)
 	}
     }
     else ans = R_BlankString;
+    vmaxset(vmax);
     return ans;
 }
 
@@ -824,7 +839,7 @@ SEXP attribute_hidden do_c_dflt(SEXP call, SEXP op, SEXP args, SEXP env)
 SEXP attribute_hidden do_unlist(SEXP call, SEXP op, SEXP args, SEXP env)
 {
     SEXP ans, t;
-    int mode, recurse, usenames;
+    int mode;
     R_xlen_t i, n = 0;
     struct BindData data;
     struct NameData nameData;
@@ -842,8 +857,9 @@ SEXP attribute_hidden do_unlist(SEXP call, SEXP op, SEXP args, SEXP env)
     /* by an optional "recursive" argument. */
 
     PROTECT(args = CAR(ans));
-    recurse = asLogical(CADR(ans));
-    usenames = asLogical(CADDR(ans));
+    int recurse = asLogical(CADR(ans));
+    int usenames = asLogical(CADDR(ans));
+    int lenient = TRUE; // was (implicitly!) FALSE  up to R 3.0.1
 
     /* Determine the type of the returned value. */
     /* The strategy here is appropriate because the */
@@ -874,7 +890,7 @@ SEXP attribute_hidden do_unlist(SEXP call, SEXP op, SEXP args, SEXP env)
     }
     else {
 	UNPROTECT(1);
-	if (isVector(args)) return args;
+	if (lenient || isVector(args)) return args;
 	else error(_("argument not a list"));
     }
 
@@ -1092,9 +1108,11 @@ SEXP attribute_hidden do_bind(SEXP call, SEXP op, SEXP args, SEXP env)
     case RAWSXP:
 	break;
 	/* we don't handle expressions: we could, but coercion of a matrix
-	   to an expression is not ideal */
+	   to an expression is not ideal.
+	   FIXME?  had  cbind(y ~ x, 1) work using lists, before */
     default:
-	error(_("cannot create a matrix from these types"));
+	error(_("cannot create a matrix from type '%s'"),
+	      type2char(mode));
     }
 
     if (PRIMVAL(op) == 1)
@@ -1224,7 +1242,8 @@ static SEXP cbind(SEXP call, SEXP args, SEXPTYPE mode, SEXP rho,
     else if (mode == VECSXP) {
 	for (t = args; t != R_NilValue; t = CDR(t)) {
 	    u = PRVALUE(CAR(t));
-	    if (isMatrix(u) || length(u) >= lenmin) {
+	    int umatrix = isMatrix(u); /* might be lost in coercion to VECSXP */
+	    if (umatrix || length(u) >= lenmin) {
 		/* we cannot assume here that coercion will work */
 		switch(TYPEOF(u)) {
 		case NILSXP:
@@ -1240,16 +1259,16 @@ static SEXP cbind(SEXP call, SEXP args, SEXPTYPE mode, SEXP rho,
 		    PROTECT(u = coerceVector(u, mode));
 		    k = LENGTH(u);
 		    if (k > 0) {
-			idx = (!isMatrix(u)) ? rows : k;
+			idx = (!umatrix) ? rows : k;
 			for (i = 0; i < idx; i++)
 			    SET_VECTOR_ELT(result, n++,
-					   duplicate(VECTOR_ELT(u, i % k)));
+					   lazy_duplicate(VECTOR_ELT(u, i % k)));
 		    }
 		    UNPROTECT(1);
 		    break;
 		default:
 		    for (i = 0; i < rows; i++)
-			SET_VECTOR_ELT(result, n++, duplicate(u));
+			SET_VECTOR_ELT(result, n++, lazy_duplicate(u));
 		}
 	    }
 	}
@@ -1297,7 +1316,7 @@ static SEXP cbind(SEXP call, SEXP args, SEXPTYPE mode, SEXP rho,
 		else if (TYPEOF(u) == REALSXP) {
 		    for (i = 0; i < idx; i++)
 			REAL(result)[n++] = REAL(u)[i % k];
-		} 
+		}
 		else { /* RAWSXP */
 		    /* FIXME: I'm not sure what the author intended when the sequence was
 		       defined as raw < logical -- it is possible to represent logical as
@@ -1331,7 +1350,7 @@ static SEXP cbind(SEXP call, SEXP args, SEXPTYPE mode, SEXP rho,
 		if (have_rnames &&
 		    GetRowNames(dn) == R_NilValue &&
 		    GetRowNames(v) != R_NilValue)
-		    SetRowNames(dn, duplicate(GetRowNames(v)));
+		    SetRowNames(dn, lazy_duplicate(GetRowNames(v)));
 
 		/* rbind() does this only  if(have_?names) .. : */
 		/* but if tnam is non-null, have_cnames = TRUE: see above */
@@ -1349,7 +1368,7 @@ static SEXP cbind(SEXP call, SEXP args, SEXPTYPE mode, SEXP rho,
 
 		if (have_rnames && GetRowNames(dn) == R_NilValue
 		    && u != R_NilValue && length(u) == rows)
-		    SetRowNames(dn, duplicate(u));
+		    SetRowNames(dn, lazy_duplicate(u));
 
 		if (TAG(t) != R_NilValue)
 		    SET_STRING_ELT(nam, j++, PRINTNAME(TAG(t)));
@@ -1474,14 +1493,15 @@ static SEXP rbind(SEXP call, SEXP args, SEXPTYPE mode, SEXP rho,
     else if (mode == VECSXP) {
 	for (t = args; t != R_NilValue; t = CDR(t)) {
 	    u = PRVALUE(CAR(t));
-	    if (isMatrix(u) || length(u) >= lenmin) {
+ 	    int umatrix = isMatrix(u), urows = umatrix ? nrows(u) : 1; /* coercing to VECSXP will lose these. PR#15468 */
+	    if (umatrix || length(u) >= lenmin) {
 		PROTECT(u = coerceVector(u, mode));
 		k = LENGTH(u);
-		idx = (isMatrix(u)) ? nrows(u) : (k > 0);
+		idx = umatrix ? urows : (k > 0);
 		for (i = 0; i < idx; i++)
 		    for (j = 0; j < cols; j++)
 		      SET_VECTOR_ELT(result, i + n + (j * rows),
-				     duplicate(VECTOR_ELT(u, (i + j * idx) % k)));
+				     lazy_duplicate(VECTOR_ELT(u, (i + j * idx) % k)));
 		n += idx;
 		UNPROTECT(1);
 	    }
@@ -1580,7 +1600,7 @@ static SEXP rbind(SEXP call, SEXP args, SEXPTYPE mode, SEXP rho,
 		if (have_cnames &&
 		    GetColNames(dn) == R_NilValue &&
 		    GetColNames(v) != R_NilValue)
-		    SetColNames(dn, duplicate(GetColNames(v)));
+		    SetColNames(dn, lazy_duplicate(GetColNames(v)));
 
 		/* cbind() doesn't test have_?names BEFORE tnam!=Nil..:*/
 		/* but if tnam is non-null, have_rnames = TRUE: see above */
@@ -1601,7 +1621,7 @@ static SEXP rbind(SEXP call, SEXP args, SEXPTYPE mode, SEXP rho,
 
 		if (have_cnames && GetColNames(dn) == R_NilValue
 		    && u != R_NilValue && length(u) == cols)
-		    SetColNames(dn, duplicate(u));
+		    SetColNames(dn, lazy_duplicate(u));
 
 		if (TAG(t) != R_NilValue)
 		    SET_STRING_ELT(nam, j++, PRINTNAME(TAG(t)));

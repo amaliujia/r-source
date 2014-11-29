@@ -1,6 +1,6 @@
 % File src/library/utils/man/windows/choose.dir.Rd
 % Part of the R package, http://www.R-project.org
-% Copyright 2007-10 R Core Team
+% Copyright 2007-13 R Core Team
 % Distributed under GPL 2 or later
 
 \name{choose.dir}
@@ -27,6 +27,9 @@ choose.dir(default = "", caption = "Select folder")
 
   To workaround a bug, on Vista and later only folders under
   \sQuote{Computer} are accessible via the widget.
+}
+\note{
+  This is only available on Windows.
 }
 \seealso{
   \code{\link{choose.files}}

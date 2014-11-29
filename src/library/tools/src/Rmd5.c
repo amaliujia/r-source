@@ -24,6 +24,7 @@
 #define ROL_UNUSED
 #include "md5.h"
 
+/* .Call so manages R_alloc stack */
 SEXP Rmd5(SEXP files)
 {
     SEXP ans;
@@ -37,7 +38,7 @@ SEXP Rmd5(SEXP files)
     PROTECT(ans = allocVector(STRSXP, nfiles));
     for(i = 0; i < nfiles; i++) {
 	path = translateChar(STRING_ELT(files, i));
-#ifdef WIN32
+#ifdef _WIN32
 	fp = fopen(path, "rb");
 #else
 	fp = fopen(path, "r");

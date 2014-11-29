@@ -1,7 +1,7 @@
 #  File src/library/stats/R/lsfit.R
 #  Part of the R package, http://www.R-project.org
 #
-#  Copyright (C) 1995-2012 The R Core Team
+#  Copyright (C) 1995-2013 The R Core Team
 #
 #  This program is free software; you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
@@ -46,8 +46,8 @@ lsfit <- function(x, y, wt = NULL, intercept = TRUE, tolerance = 1e-07,
                                  "%d missing value deleted",
                                  "%d missing values deleted"),
                         sum(!good)), domain = NA)
-	x <- as.matrix(x)[good, ]
-	y <- as.matrix(y)[good, ]
+	x <- as.matrix(x)[good, , drop=FALSE]
+	y <- as.matrix(y)[good, , drop=FALSE]
 	wt <- wt[good]
     }
 
@@ -65,8 +65,8 @@ lsfit <- function(x, y, wt = NULL, intercept = TRUE, tolerance = 1e-07,
               ", ",
               ngettext(nry,
                        "'Y' has %d case (row)",
-                       "'Y' has %d cases (rows)"),
-                       nrx, nry)),
+                       "'Y' has %d cases (rows)")),
+                       nrx, nry),
                        domain = NA)
     if(nry < ncx)
         stop(sprintf(paste0(ngettext(nry,
@@ -94,7 +94,7 @@ lsfit <- function(x, y, wt = NULL, intercept = TRUE, tolerance = 1e-07,
     }
 
     # Here y is a matrix, so z$residuals and z$effects will be
-    z <- .Call(C_Cdqrls, x, y, tolerance)
+    z <- .Call(C_Cdqrls, x, y, tolerance, FALSE)
 
     resids <- array(NA, dim = dimy)
     dim(z$residuals) <- c(nry, ncy)

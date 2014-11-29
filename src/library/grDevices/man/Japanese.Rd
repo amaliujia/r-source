@@ -1,6 +1,6 @@
 % File src/library/grDevices/man/Japanese.Rd
 % Part of the R package, http://www.R-project.org
-% Copyright 1995-2008 R Core Team
+% Copyright 1995-2013 R Core Team
 % Distributed under GPL 2 or later
 
 \name{Japanese}
@@ -37,8 +37,8 @@ plot(1:9, type = "n", axes = FALSE, frame = TRUE, ylab = "",
 par(cex = 3)
 Vf <- c("serif", "plain")
 % doubled "\" -> can't execute here!
-text(4, 2, "\\\\#J2438\\\\#J2421\\\\#J2451\\\\#J2473", vfont = Vf)
-text(4, 4, "\\\\#J2538\\\\#J2521\\\\#J2551\\\\#J2573", vfont = Vf)
+text(4, 2, "\\\\#J244b\\\\#J245b\\\\#J2473", vfont = Vf)
+text(4, 4, "\\\\#J2538\\\\#J2563\\\\#J2551\\\\#J2573", vfont = Vf)
 text(4, 6, "\\\\#J467c\\\\#J4b5c", vfont = Vf)
 text(4, 8, "Japan", vfont = Vf)
 par(cex = 1)

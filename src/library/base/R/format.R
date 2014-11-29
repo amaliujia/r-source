@@ -1,7 +1,7 @@
 #  File src/library/base/R/format.R
 #  Part of the R package, http://www.R-project.org
 #
-#  Copyright (C) 1995-2012 The R Core Team
+#  Copyright (C) 1995-2013 The R Core Team
 #
 #  This program is free software; you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
@@ -47,7 +47,7 @@ format.default <-
 	       NULL = "NULL",
 	       character = .Internal(format(x, trim, digits, nsmall, width,
 					    adj, na.encode, scientific)),
-	       call=, expression=, "function"=, "(" = deparse(x),
+	       call =, expression =, "function" =, "("  = deparse(x),
 	       raw = as.character(x),
            {
 	       ## else: logical, numeric, complex, .. :
@@ -109,6 +109,11 @@ formatC <- function (x, digits = NULL, width = NULL,
 		     decimal.mark = ".", preserve.width = "individual",
                      zero.print = NULL, drop0trailing = FALSE)
 {
+    if(is.object(x)) {
+        x <- unclass(x)
+        warning("class of 'x' was discarded")
+    }
+
     format.char <- function (x, width, flag)
     {
 	if(is.null(width)) width <- 0L
@@ -218,25 +223,25 @@ format.data.frame <- function(x, ..., justify = "none")
     nr <- .row_names_info(x, 2L)
     nc <- length(x)
     rval <- vector("list", nc)
-    for(i in 1L:nc)
+    for(i in seq_len(nc))
 	rval[[i]] <- format(x[[i]], ..., justify = justify)
     lens <- sapply(rval, NROW)
     if(any(lens != nr)) { # corrupt data frame, must have at least one column
 	warning("corrupt data frame: columns will be truncated or padded with NAs")
-	for(i in 1L:nc) {
+	for(i in seq_len(nc)) {
 	    len <- NROW(rval[[i]])
 	    if(len == nr) next
 	    if(length(dim(rval[[i]])) == 2L) {
 		rval[[i]] <- if(len < nr)
 		    rbind(rval[[i]], matrix(NA, nr-len, ncol(rval[[i]])))
-		else rval[[i]][1L:nr,]
+		else rval[[i]][seq_len(nr),]
 	    } else {
 		rval[[i]] <- if(len < nr) c(rval[[i]], rep.int(NA, nr-len))
-		else rval[[i]][1L:nr]
+		else rval[[i]][seq_len(nr)]
 	    }
 	}
     }
-    for(i in 1L:nc) {
+    for(i in seq_len(nc)) {
 	if(is.character(rval[[i]]) && inherits(rval[[i]], "character"))
 	    oldClass(rval[[i]]) <- "AsIs"
     }
@@ -262,7 +267,7 @@ format.AsIs <- function(x, width = 12, ...)
     if(is.null(width)) width = 12L
     n <- length(x)
     rvec <- rep.int(NA_character_, n)
-    for(i in 1L:n) {
+    for(i in seq_len(n)) {
         y <- x[[i]]
         ## need to remove class AsIs to avoid an infinite loop.
         cl <- oldClass(y)
@@ -294,7 +299,8 @@ prettyNum <-
 	return(x)
 
     ## else
-    if(!is.null(zero.print) && any(i0 <- as.numeric(x) == 0)) {
+    if (!is.null(zero.print) && any(i0 <- {nx <- suppressWarnings(as.numeric(x))
+					   nx == 0 & !is.na(nx)})) {
 	## print zeros according to 'zero.print' (logical or string):
 	if(length(zero.print) > 1L) stop("'zero.print' has length > 1")
 	if(is.logical(zero.print))

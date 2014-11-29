@@ -1,7 +1,7 @@
 #  File src/library/methods/R/Methods.R
 #  Part of the R package, http://www.R-project.org
 #
-#  Copyright (C) 1995-2012 The R Core Team
+#  Copyright (C) 1995-2013 The R Core Team
 #
 #  This program is free software; you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
@@ -1195,21 +1195,21 @@ callGeneric <- function(...)
     ## the  lines below this comment do what the previous version
     ## did in the expression fdef <- sys.function(frame)
     if(exists(".Generic", envir = envir, inherits = FALSE))
-	fname <- get(".Generic", envir = envir)
+	fdef <- get(get(".Generic", envir = envir), envir = envir)
     else { # in a local method (special arguments), or	an error
         localArgs <- identical(as.character(call[[1L]]), ".local")
 	if(localArgs)
 	    call <- sys.call(sys.parent(2))
-	fname <- as.character(call[[1L]])
+	if (is.name(call[[1L]]))
+	    fdef <- get(as.character(call[[1L]]), envir = envir)
+	else fdef <- call[[1L]]
     }
-    fdef <- get(fname, envir = envir)
 
     if(is.primitive(fdef)) {
         if(nargs() == 0)
             stop("'callGeneric' with a primitive needs explicit arguments (no formal args defined)")
         else {
-            fname <- as.name(fname)
-            call <- substitute(fname(...))
+            call <- substitute(fdef(...))
         }
     }
     else {
@@ -1236,12 +1236,14 @@ callGeneric <- function(...)
             }
         }
         else {
-            call <- substitute(fname(...))
+            call <- sys.call() # just use the arguments to callGeneric()
+            call[[1]] <- fname
         }
     }
     eval(call, sys.frame(sys.parent()))
 }
 
+## This uses 'where' to record the methods namespace: default may not be that
 initMethodDispatch <- function(where = topenv(parent.frame()))
     .Call(C_R_initMethodDispatch, as.environment(where))# C-level initialization
 

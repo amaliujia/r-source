@@ -67,7 +67,7 @@ endif
 
 R-DLLFLAGS=-mwindows
 ifdef USE_ICU
-LIBEXTRAS+= -licuin38 -licuuc38
+LIBEXTRAS+= -L$(ICU_PATH)/lib$(R_ARCH) $(ICU_LIBS)
 endif
 
 R-DLLLIBS =$(OPENMP) -L. $(FLIBS) -lRblas -L../../$(IMPDIR) -lRzlib -lRgraphapp -lRiconv -lcomctl32 -lversion $(LIBEXTRAS)
@@ -148,9 +148,10 @@ dllversion.o: ../include/Rversion.h
 ifeq "$(WIN)" "64"
 R.dll: $(OBJS) $(OBJS-EXTRA) $(MAINLIBS) $(EXTRALIBS) dllversion.o
 	@$(ECHO) EXPORTS > R.def
-	@$(NM) $^ | $(SED) -n  $(SYMPAT) | LC_COLLATE=C $(SORT) | uniq > R0.def
+	@$(NM) $^ | $(SED) -n  $(SYMPAT) | LC_COLLATE=C $(SORT) | \
+	  uniq $(NM_FILTER) > R0.def
 	@$(SED) -e's/@.*//' Rdll.hide | LC_COLLATE=C $(SORT) > R1.def
-	@comm -23 R0.def R1.def >> R.def
+	@LC_COLLATE=C comm -23 R0.def R1.def >> R.def
 	$(DLL) -shared $(DLLFLAGS) $($*-DLLFLAGS) -o $@ R.def $^ $($*-DLLLIBS) $(DLLLIBS)
 	@$(RM) R.def R0.def R1.def
 else
@@ -158,7 +159,7 @@ R.dll: $(OBJS) $(OBJS-EXTRA) $(MAINLIBS) $(EXTRALIBS) dllversion.o
 	@$(ECHO) EXPORTS > R.def
 	@$(NM) $^ | $(SED) -n  $(SYMPAT) | LC_COLLATE=C $(SORT) | uniq > R0.def
 	@LC_COLLATE=C $(SORT) Rdll.hide > R1.def
-	@comm -23 R0.def R1.def >> R.def
+	@LC_COLLATE=C comm -23 R0.def R1.def >> R.def
 	$(DLL) -shared $(DLLFLAGS) $($*-DLLFLAGS) -o $@ R.def $^ $($*-DLLLIBS) $(DLLLIBS)
 	@$(RM) R.def R0.def R1.def
 endif
@@ -166,8 +167,9 @@ endif
 R.exp: $(OBJS) $(OBJS-EXTRA) $(MAINLIBS) $(EXTRALIBS) dllversion.o
 	@$(ECHO) LIBRARY R.dll > R.exp
 	@$(ECHO) EXPORTS >> R.exp
-	@$(NM) $^ | $(SED) -n $(SYMPAT) | LC_COLLATE=C $(SORT) | uniq > R0.def
-	@comm -23 R0.def Rdll.hide >> R.exp
+	@$(NM) $^ | $(SED) -n $(SYMPAT) | LC_COLLATE=C $(SORT) | \
+	  uniq $(NM_FILTER) > R0.def
+	@LC_COLLATE=C comm -23 R0.def Rdll.hide >> R.exp
 	@$(RM) R0.def
 
 
@@ -267,7 +269,7 @@ distclean: clean
 	  $(MAKE) -C ../extra/$${d} -f Makefile.win distclean; \
 	done
 	@$(MAKE) -C ../../tests -f Makefile.win distclean
-	$(RM) -r ../../bin ../../include ../../lib ../../library ../../modules
+	$(RM) -R ../../bin ../../include ../../lib ../../library ../../modules
 	$(RM) ../include/config.h ../include/iconv.h ../include/psignal.h \
 	../include/Rconfig.h ../include/Rversion.h ../include/Rmath.h \
 	../include/libintl.h
@@ -277,7 +279,7 @@ distclean: clean
 	$(RM) ../library/*/src/windows/*.o ../library/*/src/windows/*.a
 	$(RM) ../library/*/src/windows/*.d ../library/*/src/windows/Makedeps
 	$(RM) ../library/*/src/windows/*.dll
-	$(RM) -r ../library/*/check
+	$(RM) -R ../library/*/check
 	$(RM) ../library/*/tests/*.ps ../library/*/tests/*.pdf
 	$(RM) ../library/tcltk/src/tcl$(TCL_VERSION).def \
 	../library/tcltk//src/tk$(TCL_VERSION).def
@@ -285,13 +287,13 @@ distclean: clean
 	$(RM) ../../doc/html/index.html \
 	../../doc/html/packages.html ../../doc/html/rwin.html \
 	../../doc/html/rw-FAQ.html ../../doc/html/NEWS.html \
-	../../doc/NEWS.rds ../../NEWS ../../NEWS.pdf \
+	../../doc/NEWS.rds ../../doc/NEWS ../../doc/NEWS.pdf \
 	../../doc/CHANGES.rds ../../doc/html/CHANGES.html
 	$(RM) ../../etc/Makeconf ../../etc/Rconsole ../../etc/Rdevga \
 	../../etc/Rprofile.site ../../etc/rgb.txt ../../etc/Rcmd_environ \
 	../../tests/*.Rout ../../tests/*.Rout.fail
-	$(RM) -r ../../etc/i386 ../../etc/x64 # do both sub-archs
-	$(RM) -r ../../share/zoneinfo
+	$(RM) -R ../../etc/i386 ../../etc/x64 # do both sub-archs
+	$(RM) -R ../../share/zoneinfo
 	$(MAKE) -C fixed distclean
 	$(MAKE) -C ../include -f Makefile.win distclean
 	-$(MAKE) -C installer distclean
@@ -301,8 +303,8 @@ distclean: clean
 	$(RM) ../../SVN-REVISION.bak
 	$(RM) ../../doc/manual/rw-FAQ
 	$(MAKE) -C cran clean
-	$(RM) -r ../library/.vignettes # it gets left behind if there is an error
-	$(RM) -r ../../share/locale # relic of earlier versions
+	$(RM) -R ../library/.vignettes # it gets left behind if there is an error
+	$(RM) -R ../../share/locale # relic of earlier versions
 	$(RM) MkRules Rpwd.exe # do this last of all
 
 veryclean: distclean

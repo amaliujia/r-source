@@ -1,6 +1,6 @@
 /*
  *  R : A Computer Language for Statistical Data Analysis
- *  Copyright (C) 2006-13  The R Core Team
+ *  Copyright (C) 2006-2013  The R Core Team
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -39,7 +39,7 @@ R --slave --no-restore --vanilla --file=foo [script_args]
 # include <config.h>
 #endif
 
-#ifdef WIN32
+#ifdef _WIN32
 #include <psignal.h>
 /* on some systems needs to be included before <sys/types.h> */
 #endif
@@ -70,7 +70,7 @@ R --slave --no-restore --vanilla --file=foo [script_args]
 # endif
 #endif
 
-#ifndef WIN32
+#ifndef _WIN32
 #ifndef R_ARCH /* R_ARCH should be always defined, but for safety ... */
 #define R_ARCH ""
 #endif
@@ -91,7 +91,7 @@ static int verbose = 0;
 
 void usage(void)
 {
-    fprintf(stderr, "Usage: /path/to/Rscript [--options] [-e expr] file [args]\n\n");
+    fprintf(stderr, "Usage: /path/to/Rscript [--options] [-e expr [-e expr2 ...] | file] [args]\n\n");
     fprintf(stderr, "--options accepted are\n");
     fprintf(stderr, "  --help              Print usage and exit\n");
     fprintf(stderr, "  --version           Print version and exit\n");
@@ -108,6 +108,8 @@ void usage(void)
     fprintf(stderr, "  --vanilla           Combine --no-save, --no-restore, --no-site-file\n");
     fprintf(stderr, "                        --no-init-file and --no-environ\n");
     fprintf(stderr, "\n'file' may contain spaces but not shell metacharacters\n");
+    fprintf(stderr, "Expressions (one or more '-e <expr>') may be used *instead* of 'file'\n");
+    fprintf(stderr, "See also  ?Rscript  from within R\n");
 }
 
 
@@ -129,7 +131,7 @@ int main(int argc, char *argv[])
     }
 
     p = getenv("RHOME");
-#ifdef WIN32
+#ifdef _WIN32
     if(p && *p)
 	snprintf(cmd, PATH_MAX+1, "%s\\%s\\Rterm.exe",  p, BINDIR);
     else {
@@ -224,14 +226,19 @@ int main(int argc, char *argv[])
 	snprintf(buf, PATH_MAX+8, "--file=%s", argv[i0]);
 	av[ac++] = buf;
     }
-    av[ac++] = "--args";
-    for(i = i0+1; i < argc; i++) av[ac++] = argv[i];
+    // copy any user arguments, preceded by "--args"
+    i = i0+1;
+    if (i < argc) {
+	av[ac++] = "--args";
+	for(; i < argc; i++)
+	    av[ac++] = argv[i];
+    }
     av[ac] = (char *) NULL;
 #ifdef HAVE_PUTENV
     if(!set_dp && !getenv("R_DEFAULT_PACKAGES"))
 	putenv("R_DEFAULT_PACKAGES=datasets,utils,grDevices,graphics,stats");
 
-#ifndef WIN32
+#ifndef _WIN32
     /* pass on r_arch from this binary to R as a default */
     if (!getenv("R_ARCH") && *rarch) {
 	/* we have to prefix / so we may as well use putenv */
@@ -250,7 +257,7 @@ int main(int argc, char *argv[])
 	for(i = 1; i < ac-1; i++) fprintf(stderr, " %s", av[i]);
 	fprintf(stderr, "'\n\n");
     }
-#ifndef WIN32
+#ifndef _WIN32
     res = execv(cmd, av); /* will not return if R is launched */
     perror("Rscript execution error");
 #else

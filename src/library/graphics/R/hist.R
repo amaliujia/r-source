@@ -1,7 +1,7 @@
 #  File src/library/graphics/R/hist.R
 #  Part of the R package, http://www.R-project.org
 #
-#  Copyright (C) 1995-2012 The R Core Team
+#  Copyright (C) 1995-2013 The R Core Team
 #
 #  This program is free software; you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
@@ -63,6 +63,13 @@ hist.default <-
 	} else if(is.function(breaks)) {
 	    breaks <- breaks(x)
 	}
+        ## if(!is.numeric(breaks) || !is.finite(breaks) || breaks < 1L)
+        ##     stop("invalid number of 'breaks'")
+        ## breaks <- pretty (range(x), n = breaks, min.n = 1)
+        ## nB <- length(breaks)
+        ## if(nB <= 1) ##-- Impossible !
+        ##     stop(gettextf("hist.default: pretty() error, breaks=%s",
+        ##                   format(breaks)), domain = NA)
         if (length(breaks) == 1) {
             if(!is.numeric(breaks) || !is.finite(breaks) || breaks < 1L)
                 stop("invalid number of 'breaks'")
@@ -178,7 +185,7 @@ plot.histogram <-
 	if (missing(ylab))
 	    ylab <- if (!freq) "Density" else "Frequency"
 	plot.new()
-	plot.window(xlim, ylim, "")	#-> ylim's default from 'y'
+	plot.window(xlim, ylim, "", ...)	#-> ylim's default from 'y'
 	if(ann) title(main = main, sub = sub, xlab = xlab, ylab = ylab, ...)
 	if(axes) {
 	    axis(1, ...)

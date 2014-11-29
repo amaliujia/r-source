@@ -1,6 +1,6 @@
 % File src/library/stats/man/influence.measures.Rd
 % Part of the R package, http://www.R-project.org
-% Copyright 1995-2007 R Core Team
+% Copyright 1995-2013 R Core Team
 % Distributed under GPL 2 or later
 
 \name{influence.measures}
@@ -14,8 +14,8 @@
 \concept{DFFITs}
 
 \alias{influence.measures}
-\alias{print.infl}
-\alias{summary.infl}
+%\alias{print.infl}
+%\alias{summary.infl}
 \alias{hat}
 \alias{hatvalues}
 \alias{hatvalues.lm}

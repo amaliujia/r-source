@@ -1,9 +1,10 @@
 % File src/library/graphics/man/image.Rd
 % Part of the R package, http://www.R-project.org
-% Copyright 1995-2013 R Core Team
+% Copyright 1995-2014 R Core Team
 % Distributed under GPL 2 or later
 
 \newcommand{\CRANpkg}{\href{http://CRAN.R-project.org/package=#1}{\pkg{#1}}}
+\newcommand{\sspace}{\ifelse{latex}{\out{~}}{ }}
 
 \name{image}
 \alias{image}
@@ -102,7 +103,7 @@ image(x, \dots)
   Notice that \code{image} interprets the \code{z} matrix as a table of
   \code{f(x[i], y[j])} values, so that the x axis corresponds to row
   number and the y axis to column number, with column 1 at the bottom,
-  i.e. a 90 degree counter-clockwise rotation of the conventional
+  i.e.\sspace{}a 90 degree counter-clockwise rotation of the conventional
   printed layout of a matrix.
 
   Images for large \code{z} on a regular grid are rendered more
@@ -121,8 +122,9 @@ image(x, \dots)
 
   If \code{useRaster} is not specified, raster images are used when the
   \code{\link{getOption}("preferRaster")} is true, the grid is regular
-  and either \code{\link{dev.capabilities}("raster")} is \code{"yes"} or
-  it is \code{"non-missing"} and there are no missing values.
+  and either \code{\link{dev.capabilities}("rasterImage")$rasterImage}
+  is \code{"yes"} or it is \code{"non-missing"} and there are no missing
+  values.
 }
 
 \note{

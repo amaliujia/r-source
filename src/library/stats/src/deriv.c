@@ -1,7 +1,7 @@
 /*
  *  R : A Computer Language for Statistical Data Analysis
  *  Copyright (C) 1995, 1996  Robert Gentleman and Ross Ihaka
- *  Copyright (C) 1998-2012   The R Core Team.
+ *  Copyright (C) 1998-2014   The R Core Team.
  *  Copyright (C) 2004-5        The R Foundation
  *
  *  This program is free software; you can redistribute it and/or modify
@@ -27,6 +27,13 @@
 #endif
 
 #include "Defn.h"
+#undef _
+#ifdef ENABLE_NLS
+#include <libintl.h>
+#define _(String) dgettext ("stats", String)
+#else
+#define _(String) (String)
+#endif
 
 static SEXP ParenSymbol;
 static SEXP PlusSymbol;
@@ -274,7 +281,7 @@ static SEXP D(SEXP expr, SEXP var)
 #define PP_S(F,a1,a2) PP(simplify(F,a1,a2))
 #define PP_S2(F,a1)   PP(simplify(F,a1, R_MissingArg))
 
-    SEXP ans=R_NilValue, expr1, expr2;
+    SEXP ans = R_NilValue, expr1, expr2;
     switch(TYPEOF(expr)) {
     case LGLSXP:
     case INTSXP:
@@ -375,6 +382,8 @@ static SEXP D(SEXP expr, SEXP var)
 	    UNPROTECT(1);
 	}
 	else if (CAR(expr) == LogSymbol) {
+	    if (length(expr) != 2)
+		error("only single-argument calls are supported");
 	    ans = simplify(DivideSymbol,
 			   PP(D(CADR(expr), var)),
 			   CADR(expr));
@@ -447,28 +456,28 @@ static SEXP D(SEXP expr, SEXP var)
 	    ans = simplify(DivideSymbol,
 			   PP(D(CADR(expr), var)),
 			   PP_S(SqrtSymbol,
-				PP_S(MinusSymbol, Constant(1.),
-				     PP_S(PowerSymbol,CADR(expr),Constant(2.))),
+				PP_S(MinusSymbol, PP(Constant(1.)),
+				     PP_S(PowerSymbol,CADR(expr),PP(Constant(2.)))),
 				R_MissingArg));
-	    UNPROTECT(4);
+	    UNPROTECT(6);
 	}
 	else if (CAR(expr) == AcosSymbol) {
 	    ans = simplify(MinusSymbol,
 			   PP_S(DivideSymbol,
 				PP(D(CADR(expr), var)),
 				PP_S(SqrtSymbol,
-				     PP_S(MinusSymbol,Constant(1.),
+				     PP_S(MinusSymbol,PP(Constant(1.)),
 					  PP_S(PowerSymbol,
-					       CADR(expr),Constant(2.))),
+					       CADR(expr),PP(Constant(2.)))),
 				     R_MissingArg)), R_MissingArg);
-	    UNPROTECT(5);
+	    UNPROTECT(7);
 	}
 	else if (CAR(expr) == AtanSymbol) {
 	    ans = simplify(DivideSymbol,
 			   PP(D(CADR(expr), var)),
-			   PP_S(PlusSymbol,Constant(1.),
-				PP_S(PowerSymbol, CADR(expr),Constant(2.))));
-	    UNPROTECT(3);
+			   PP_S(PlusSymbol,PP(Constant(1.)),
+				PP_S(PowerSymbol, CADR(expr),PP(Constant(2.)))));
+	    UNPROTECT(5);
 	}
 	else if (CAR(expr) == LGammaSymbol) {
 	    ans = simplify(TimesSymbol,
@@ -493,31 +502,31 @@ static SEXP D(SEXP expr, SEXP var)
 	else if (CAR(expr) == TriGammaSymbol) {
 	    ans = simplify(TimesSymbol,
 			   PP(D(CADR(expr), var)),
-			   PP_S(PsiSymbol, CADR(expr), ScalarInteger(2)));
-	    UNPROTECT(2);
+			   PP_S(PsiSymbol, CADR(expr), PP(ScalarInteger(2))));
+	    UNPROTECT(3);
 	}
 	else if (CAR(expr) == PsiSymbol) {
 	    if (length(expr) == 2){
 		ans = simplify(TimesSymbol,
 			       PP(D(CADR(expr), var)),
-			       PP_S(PsiSymbol, CADR(expr), ScalarInteger(1)));
-		UNPROTECT(2);
+			       PP_S(PsiSymbol, CADR(expr), PP(ScalarInteger(1))));
+		UNPROTECT(3);
 	    } else if (TYPEOF(CADDR(expr)) == INTSXP ||
 		       TYPEOF(CADDR(expr)) == REALSXP) {
 		ans = simplify(TimesSymbol,
 			       PP(D(CADR(expr), var)),
 			       PP_S(PsiSymbol,
 				    CADR(expr),
-				    ScalarInteger(asInteger(CADDR(expr))+1)));
-		UNPROTECT(2);
+				    PP(ScalarInteger(asInteger(CADDR(expr))+1))));
+		UNPROTECT(3);
 	    } else {
 		ans = simplify(TimesSymbol,
 			       PP(D(CADR(expr), var)),
 			       PP_S(PsiSymbol,
 				    CADR(expr),
 				    simplify(PlusSymbol, CADDR(expr),
-					     ScalarInteger(1))));
-		UNPROTECT(2);
+					     PP(ScalarInteger(1)))));
+		UNPROTECT(3);
 	    }
 	}
 
@@ -633,7 +642,7 @@ SEXP doD(SEXP args)
 	error(_("variable must be a character string"));
     if (length(var) > 1)
 	warning(_("only the first element is used as variable name"));
-    var = install(translateChar(STRING_ELT(var, 0)));
+    var = installTrChar(STRING_ELT(var, 0));
     InitDerivSymbols();
     PROTECT(expr = D(expr, var));
     expr = AddParens(expr);
@@ -707,8 +716,10 @@ static int Accumulate2(SEXP expr, SEXP exprlist)
 
 static SEXP MakeVariable(int k, SEXP tag)
 {
+    const void *vmax = vmaxget();    
     char buf[64];
     snprintf(buf, 64, "%s%d", translateChar(STRING_ELT(tag, 0)), k);
+    vmaxset(vmax);
     return install(buf);
 }
 
@@ -947,14 +958,14 @@ SEXP deriv(SEXP args)
     UNPROTECT(1);
     for(i=0, k=0; i<nderiv ; i++) {
 	PROTECT(ans = duplicate(expr));
-	PROTECT(ans = D(ans, install(translateChar(STRING_ELT(names, i)))));
+	PROTECT(ans = D(ans, installTrChar(STRING_ELT(names, i))));
 	PROTECT(ans2 = duplicate(ans));	/* keep a temporary copy */
 	d_index[i] = FindSubexprs(ans, exprlist, tag); /* examine the derivative first */
 	PROTECT(ans = duplicate(ans2));	/* restore the copy */
 	if (hessian) {
 	    for(j = i; j < nderiv; j++) {
 		PROTECT(ans2 = duplicate(ans)); /* install could allocate */
-		PROTECT(ans2 = D(ans2, install(translateChar(STRING_ELT(names, j)))));
+		PROTECT(ans2 = D(ans2, installTrChar(STRING_ELT(names, j))));
 		d2_index[k] = FindSubexprs(ans2, exprlist, tag);
 		k++;
 		UNPROTECT(2);
@@ -978,13 +989,13 @@ SEXP deriv(SEXP args)
 	    Accumulate2(MakeVariable(d_index[i], tag), exprlist);
 	    if (hessian) {
 		PROTECT(ans = duplicate(expr));
-		PROTECT(ans = D(ans, install(translateChar(STRING_ELT(names, i)))));
+		PROTECT(ans = D(ans, installTrChar(STRING_ELT(names, i))));
 		for (j = i; j < nderiv; j++) {
 		    if (d2_index[k]) {
 			Accumulate2(MakeVariable(d2_index[k], tag), exprlist);
 		    } else {
 			PROTECT(ans2 = duplicate(ans));
-			PROTECT(ans2 = D(ans2, install(translateChar(STRING_ELT(names, j)))));
+			PROTECT(ans2 = D(ans2, installTrChar(STRING_ELT(names, j))));
 			Accumulate2(ans2, exprlist);
 			UNPROTECT(2);
 		    }
@@ -994,7 +1005,7 @@ SEXP deriv(SEXP args)
 	    }
 	} else { /* the first derivative is constant or simple variable */
 	    PROTECT(ans = duplicate(expr));
-	    PROTECT(ans = D(ans, install(translateChar(STRING_ELT(names, i)))));
+	    PROTECT(ans = D(ans, installTrChar(STRING_ELT(names, i))));
 	    Accumulate2(ans, exprlist);
 	    UNPROTECT(2);
 	    if (hessian) {
@@ -1003,7 +1014,7 @@ SEXP deriv(SEXP args)
 			Accumulate2(MakeVariable(d2_index[k], tag), exprlist);
 		    } else {
 			PROTECT(ans2 = duplicate(ans));
-			PROTECT(ans2 = D(ans2, install(translateChar(STRING_ELT(names, j)))));
+			PROTECT(ans2 = D(ans2, installTrChar(STRING_ELT(names, j))));
 			if(isZero(ans2)) Accumulate2(R_MissingArg, exprlist);
 			else Accumulate2(ans2, exprlist);
 			UNPROTECT(2);
@@ -1088,7 +1099,7 @@ SEXP deriv(SEXP args)
 	PROTECT(ans = allocList(length(names)));
 	SET_FORMALS(funarg, ans);
 	for(i = 0; i < length(names); i++) {
-	    SET_TAG(ans, install(translateChar(STRING_ELT(names, i))));
+	    SET_TAG(ans, installTrChar(STRING_ELT(names, i)));
 	    SETCAR(ans, R_MissingArg);
 	    ans = CDR(ans);
 	}

@@ -1,7 +1,7 @@
 #  File src/library/tools/R/Rd.R
 #  Part of the R package, http://www.R-project.org
 #
-#  Copyright (C) 1995-2012 The R Core Team
+#  Copyright (C) 1995-2013 The R Core Team
 #
 #  This program is free software; you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
@@ -290,7 +290,12 @@ function(package, dir, lib.loc = NULL)
         if(file_test("-f", paste(db_file, "rdx", sep = "."))) {
             db <- fetchRdDB(db_file)
             pathfile <- file.path(dir, "help", "paths.rds")
-            if(file.exists(pathfile)) names(db) <- readRDS(pathfile)
+            if(file.exists(pathfile)) {
+                paths <- readRDS(pathfile)
+                if(!is.null(first <- attr(paths, "first")))
+                    paths <- substring(paths, first)
+                names(db) <- paths
+            }
             return(db)
         }
         db_file <- file.path(docs_dir, sprintf("%s.Rd.gz", package))
@@ -334,7 +339,14 @@ function(package, dir, lib.loc = NULL)
                  domain = NA)
         else
             dir <- file_path_as_absolute(dir)
-        db <- .build_Rd_db(dir, stages = "build")
+        built_file <- file.path(dir, "build", "partial.rdb")
+        db <- .build_Rd_db(dir,
+                           stages = "build",
+                           built_file = built_file)
+        if(length(db)) {
+            first <- nchar(file.path(dir, "man")) + 2L
+            names(db) <- substring(names(db), first)
+        }
     }
 
     db

@@ -1,6 +1,6 @@
 % File src/library/utils/man/tar.Rd
 % Part of the R package, http://www.R-project.org
-% Copyright 2009-13 R Core Team
+% Copyright 2009-2013 R Core Team
 % Distributed under GPL 2 or later
 
 \name{tar}
@@ -33,7 +33,7 @@ tar(tarfile, files = NULL,
     for the internal method.}
 
   \item{tar}{character string: the path to the command to be used.  If
-    the command itself contains spaces it needs to be quoted (e.g. by
+    the command itself contains spaces it needs to be quoted (e.g., by
     \code{\link{shQuote}}) -- but argument \code{tar} can also contain
     flags separated from the command by spaces.}
 
@@ -105,8 +105,8 @@ tar(tarfile, files = NULL,
 
     Names of links in the \sQuote{ustar} format are restricted to 100
     bytes.  There is an GNU extension for arbitrarily long link names,
-    but \command{bsdtar} does not read.  As from \R 2.15.3 the internal
-    method uses the GNU extension, with a warning.
+    but \command{bsdtar} does not read.  The internal method uses the
+    GNU extension, with a warning.
 
     \item Header fields, in particular the padding to be used when
     fields are not full or not used.  POSIX did define the correct

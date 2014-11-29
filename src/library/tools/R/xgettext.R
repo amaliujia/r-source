@@ -1,7 +1,7 @@
 #  File src/library/tools/R/xgettext.R
 #  Part of the R package, http://www.R-project.org
 #
-#  Copyright (C) 1995-2012 The R Core Team
+#  Copyright (C) 1995-2013 The R Core Team
 #
 #  This program is free software; you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
@@ -226,10 +226,10 @@ checkPoFile <- function(f, strictPlural = FALSE)
 		i <- i + 1L
 		s1 <- paste0(s1, sub('^["](.*)["][[:blank:]]*$', "\\1", lines[i]))
 	    }
-	    f1 <- try(getfmts(s1), silent = TRUE)
+	    f1 <- tryCatch(getfmts(s1), error = function(e)e)
 	    j <- i + 1L
 
-	    if (noCformat || inherits(f1, "try-error")) {
+	    if (noCformat || inherits(f1, "error")) {
 		noCformat <- FALSE
 		next
 	    }
@@ -257,7 +257,7 @@ checkPoFile <- function(f, strictPlural = FALSE)
 		    break
 		}
 
-		f2 <- try(getfmts(s2), silent = TRUE)
+		f2 <- tryCatch(getfmts(s2), error = function(e)e)
 
 		if (statement == "msgid_plural") {
 		    if (!strictPlural) {
@@ -270,8 +270,8 @@ checkPoFile <- function(f, strictPlural = FALSE)
 		if (s2 != "" &&
 		     !(identical(f1, f2) || identical(f1_plural, f2))) {
 		    location <- paste0(f, ":", j)
-		    if (inherits(f2, "try-error"))
-			diff <- conditionMessage(attr(f2, "condition"))
+		    if (inherits(f2, "error"))
+			diff <- conditionMessage(f2)
 		    else {
 		    	if (length(f1) < length(f2)) {
 			    diff <- "too many entries"

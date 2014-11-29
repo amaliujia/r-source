@@ -1,7 +1,7 @@
 #  File src/library/utils/R/packages.R
 #  Part of the R package, http://www.R-project.org
 #
-#  Copyright (C) 1995-2012 The R Core Team
+#  Copyright (C) 1995-2014 The R Core Team
 #
 #  This program is free software; you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
@@ -275,10 +275,12 @@ function(db)
     dups <- packages[duplicated(packages)]
     drop <- integer()
     CRAN <- getOption("repos")["CRAN"]
+    ## do nothing if there is no CRAN repos on the list
+    if(is.na(CRAN)) return(db)
     for(d in dups) {
         pos <- which(packages == d)
-        drop <- c(drop, pos[substring(db[pos, "Repository"], 1,
-                                      nchar(CRAN)) != CRAN])
+        ind <- substring(db[pos, "Repository"], 1, nchar(CRAN)) != CRAN
+        if(!all(ind)) drop <- c(drop, pos[ind])
     }
     if(length(drop)) db[-drop, , drop = FALSE] else db
 }
@@ -529,7 +531,7 @@ new.packages <- function(lib.loc = NULL, repos = getOption("repos"),
             }
             if("Built" %in% fields) {
                 ## This should not be missing.
-                if(is.null(md$Built$R)) {
+                if(is.null(md$Built$R) || !("Built" %in% names(desc))) {
                     warning(gettextf("metadata of %s is corrupt",
                                      sQuote(pkgpath)), domain = NA)
                     next
@@ -863,8 +865,8 @@ compareVersion <- function(a, b)
 {
     if(is.na(a)) return(-1L)
     if(is.na(b)) return(1L)
-    a <- as.integer(strsplit(a, "[\\.-]")[[1L]])
-    b <- as.integer(strsplit(b, "[\\.-]")[[1L]])
+    a <- as.integer(strsplit(a, "[.-]")[[1L]])
+    b <- as.integer(strsplit(b, "[.-]")[[1L]])
     for(k in seq_along(a))
         if(k <= length(b)) {
             if(a[k] > b[k]) return(1) else if(a[k] < b[k]) return(-1L)
@@ -963,7 +965,7 @@ compareVersion <- function(a, b)
     ## If recursive = TRUE, do this recursively.
     if(!length(pkgs)) return(NULL)
     if(is.null(available))
-        stop(gettextf("%s must be supplied", sQuote(available)), domain = NA)
+        stop(gettextf("%s must be supplied", sQuote("available")), domain = NA)
     info <- available[pkgs, dependencies, drop = FALSE]
     x <- vector("list", length(pkgs)); names(x) <- pkgs
     if(recursive) {

@@ -1,6 +1,6 @@
 % File src/library/base/man/locales.Rd
 % Part of the R package, http://www.R-project.org
-% Copyright 1995-2012 R Core Team
+% Copyright 1995-2014 R Core Team
 % Distributed under GPL 2 or later
 
 \name{locales}
@@ -68,9 +68,15 @@ Sys.setlocale(category = "LC_ALL", locale = "")
   character set) during a session may not work and are likely to lead to
   some confusion.
 
-  Note that the \env{\link{LANGUAGE}} environment variable has
-  precedence over \code{"LC_MESSAGES"} in selecting the language of
-  message translation on most \R platforms.
+  Note that the \env{LANGUAGE} environment variable has precedence over
+  \code{"LC_MESSAGES"} in selecting the language for message translation
+  on most \R platforms.
+  
+  On platforms where ICU is used for collation the locale used for
+  collation can be reset by \code{\link{icuSetCollate}}).  Except on
+  Windows, the initial setting is taken from the \code{"LC_COLLATE"}
+  category, and it is reset when this is changed by a call to
+  \code{Sys.setlocale}.
 }
 \value{
   A character string of length one describing the locale in use (after
@@ -127,12 +133,13 @@ Sys.getlocale("LC_TIME")
 Sys.setlocale("LC_TIME", "de")     # Solaris: details are OS-dependent
 Sys.setlocale("LC_TIME", "de_DE.utf8")   # Modern Linux etc.
 Sys.setlocale("LC_TIME", "de_DE.UTF-8")  # ditto
-Sys.setlocale("LC_TIME", "de_DE")  # Mac OS X, in UTF-8
+Sys.setlocale("LC_TIME", "de_DE")  # OS X, in UTF-8
 Sys.setlocale("LC_TIME", "German") # Windows
 }
 Sys.getlocale("LC_PAPER")          # may or may not be set
 
+\dontrun{
 Sys.setlocale("LC_COLLATE", "C")   # turn off locale-specific sorting,
-                                   #  usually
+                                   # usually, but not on all platforms}
 }
 \keyword{utilities}

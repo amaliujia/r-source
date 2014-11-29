@@ -16,7 +16,8 @@ example(topic, package = NULL, lib.loc = NULL,
         character.only = FALSE, give.lines = FALSE, local = FALSE,
         echo = TRUE, verbose = getOption("verbose"),
         setRNG = FALSE, ask = getOption("example.ask"),
-        prompt.prefix = abbreviate(topic, 6))
+        prompt.prefix = abbreviate(topic, 6),
+        run.dontrun = FALSE)
 }
 \arguments{
   \item{topic}{name or literal character string: the online
@@ -41,7 +42,7 @@ example(topic, package = NULL, lib.loc = NULL,
     number generator state is saved, then initialized to a specified state,
     the example is run and the (saved) state is restored.
     \code{setRNG = TRUE} sets the same state as
-    \code{R CMD \link{check}} does for
+    \command{R CMD \link{check}} does for
     running a package's examples.  This is currently equivalent to
     \code{setRNG = \{RNGkind("default", "default"); set.seed(1)\}}.}
   \item{ask}{logical (or \code{"default"}) indicating if
@@ -53,6 +54,8 @@ example(topic, package = NULL, lib.loc = NULL,
     device and to any devices opened by the example code.}
   \item{prompt.prefix}{character; prefixes the prompt to be used if
     \code{echo = TRUE}.}
+  \item{run.dontrun}{logical indicating that \verb{\dontrun}
+    should be ignored.}
 }
 \value{
   The value of the last evaluated expression, unless \code{give.lines}

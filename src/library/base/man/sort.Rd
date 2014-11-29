@@ -1,6 +1,6 @@
 % File src/library/base/man/sort.Rd
 % Part of the R package, http://www.R-project.org
-% Copyright 1995-2012 R Core Team
+% Copyright 1995-2013 R Core Team
 % Distributed under GPL 2 or later
 
 \name{sort}
@@ -72,7 +72,7 @@ sort.int(x, partial = NULL, na.last = NA, decreasing = FALSE,
   are more than 10.)  Names are discarded for partial sorting.
 
   Method \code{"shell"} uses Shellsort (an \eqn{O(n^{4/3})} variant from
-  Sedgewick (1996)).  If \code{x} has names a stable modification is
+  Sedgewick (1986)).  If \code{x} has names a stable modification is
   used, so ties are not reordered.  (This only matters if names are
   present.)
 
@@ -141,7 +141,6 @@ require(stats)
 
 x <- swiss$Education[1:25]
 x; sort(x); sort(x, partial = c(10, 15))
-median.default # shows you another example for 'partial'
 
 ## illustrate 'stable' sorting (of ties):
 sort(c(10:3, 2:12), method = "sh", index.return = TRUE) # is stable

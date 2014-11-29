@@ -163,7 +163,7 @@ SEXP getAttrib(SEXP vec, SEXP name)
 	! (TYPEOF(vec) == LISTSXP || TYPEOF(vec) == LANGSXP))
 	return R_NilValue;
 
-    if (isString(name)) name = install(translateChar(STRING_ELT(name, 0)));
+    if (isString(name)) name = installTrChar(STRING_ELT(name, 0));
 
     /* special test for c(NA, n) rownames of data frames: */
     if (name == R_RowNamesSymbol) {
@@ -209,7 +209,7 @@ SEXP do_copyDFattr(SEXP call, SEXP op, SEXP args, SEXP env)
 {
     checkArity(op, args);
     SEXP in = CAR(args), out = CADR(args);
-    SET_ATTRIB(out, ATTRIB(in));
+    SET_ATTRIB(out, shallow_duplicate(ATTRIB(in)));
     IS_S4_OBJECT(in) ?  SET_S4_OBJECT(out) : UNSET_S4_OBJECT(out);
     SET_OBJECT(out, OBJECT(in));
     return out;
@@ -222,8 +222,9 @@ SEXP setAttrib(SEXP vec, SEXP name, SEXP val)
     PROTECT(vec);
     PROTECT(name);
 
-    if (isString(name))
-	name = install(translateChar(STRING_ELT(name, 0)));
+    if (isString(name)) {
+	name = installTrChar(STRING_ELT(name, 0));
+    }
     if (val == R_NilValue) {
 	UNPROTECT(2);
 	return removeAttrib(vec, name);
@@ -233,8 +234,8 @@ SEXP setAttrib(SEXP vec, SEXP name, SEXP val)
     if (vec == R_NilValue)
 	error(_("attempt to set an attribute on NULL"));
 
-    if (NAMED(val)) val = duplicate(val);
-    SET_NAMED(val, NAMED(val) | NAMED(vec));
+    if (MAYBE_REFERENCED(val)) val = R_FixupRHS(vec, val);
+    //SET_NAMED(val, NAMED(val) | NAMED(vec));
     UNPROTECT(2);
 
     if (name == R_NamesSymbol)
@@ -466,7 +467,7 @@ static SEXP commentgets(SEXP vec, SEXP comment)
 SEXP attribute_hidden do_commentgets(SEXP call, SEXP op, SEXP args, SEXP env)
 {
     checkArity(op, args);
-    if (NAMED(CAR(args)) == 2) SETCAR(args, duplicate(CAR(args)));
+    if (MAYBE_SHARED(CAR(args))) SETCAR(args, duplicate(CAR(args)));
     if (length(CADR(args)) == 0) SETCADR(args, R_NilValue);
     setAttrib(CAR(args), R_CommentSymbol, CADR(args));
     SET_NAMED(CAR(args), 0);
@@ -525,7 +526,7 @@ SEXP attribute_hidden do_classgets(SEXP call, SEXP op, SEXP args, SEXP env)
     checkArity(op, args);
     check1arg(args, call, "x");
 
-    if (NAMED(CAR(args)) == 2) SETCAR(args, duplicate(CAR(args)));
+    if (MAYBE_SHARED(CAR(args))) SETCAR(args, shallow_duplicate(CAR(args)));
     if (length(CADR(args)) == 0) SETCADR(args, R_NilValue);
     if(IS_S4_OBJECT(CAR(args)))
       UNSET_S4_OBJECT(CAR(args));
@@ -642,9 +643,11 @@ static SEXP cache_class(const char *class, SEXP klass) {
     return klass;
 }
 
-static SEXP S4_extends(SEXP klass) {
-  static SEXP s_extends = 0, s_extendsForS3;
+static SEXP S4_extends(SEXP klass) 
+{
+    static SEXP s_extends = 0, s_extendsForS3;
     SEXP e, val; const char *class;
+    const void *vmax = vmaxget();
     if(!s_extends) {
 	s_extends = install("extends");
 	s_extendsForS3 = install(".extendsForS3");
@@ -656,6 +659,7 @@ static SEXP S4_extends(SEXP klass) {
         return klass;
     class = translateChar(STRING_ELT(klass, 0)); /* TODO: include package attr. */
     val = findVarInFrame(R_S4_extends_table, install(class));
+    vmaxset(vmax);
     if(val != R_UnboundValue)
        return val;
     PROTECT(e = allocVector(LANGSXP, 2));
@@ -763,8 +767,8 @@ SEXP attribute_hidden do_namesgets(SEXP call, SEXP op, SEXP args, SEXP env)
 	getAttrib(CAR(args), R_NamesSymbol) == R_NilValue)
 	return CAR(args);
     PROTECT(args = ans);
-    if (NAMED(CAR(args)) == 2)
-	SETCAR(args, duplicate(CAR(args)));
+    if (MAYBE_SHARED(CAR(args)))
+	SETCAR(args, shallow_duplicate(CAR(args)));
     if(IS_S4_OBJECT(CAR(args))) {
 	const char *klass = CHAR(STRING_ELT(R_data_class(CAR(args), FALSE), 0));
 	if(getAttrib(CAR(args), R_NamesSymbol) == R_NilValue) {
@@ -852,7 +856,7 @@ SEXP namesgets(SEXP vec, SEXP val)
 	    if (STRING_ELT(val, i) != R_NilValue
 		&& STRING_ELT(val, i) != R_NaString
 		&& *CHAR(STRING_ELT(val, i)) != 0) /* test of length */
-		SET_TAG(s, install(translateChar(STRING_ELT(val, i))));
+		SET_TAG(s, installTrChar(STRING_ELT(val, i)));
 	    else
 		SET_TAG(s, R_NilValue);
     }
@@ -893,7 +897,7 @@ SEXP attribute_hidden do_dimnamesgets(SEXP call, SEXP op, SEXP args, SEXP env)
     if (DispatchOrEval(call, op, "dimnames<-", args, env, &ans, 0, 1))
 	return(ans);
     PROTECT(args = ans);
-    if (NAMED(CAR(args)) > 1) SETCAR(args, duplicate(CAR(args)));
+    if (MAYBE_SHARED(CAR(args))) SETCAR(args, shallow_duplicate(CAR(args)));
     setAttrib(CAR(args), R_DimNamesSymbol, CADR(args));
     UNPROTECT(1);
     SET_NAMED(CAR(args), 0);
@@ -961,6 +965,11 @@ SEXP dimnamesgets(SEXP vec, SEXP val)
 	UNPROTECT(1);
 	PROTECT(val = newval);
     }
+    if (MAYBE_REFERENCED(val)) {
+	newval = shallow_duplicate(val);
+	UNPROTECT(1);
+	PROTECT(val = newval);
+    }	
     if (k != length(val))
 	error(_("length of 'dimnames' [%d] must match that of 'dims' [%d]"),
 	      length(val), k);
@@ -981,7 +990,7 @@ SEXP dimnamesgets(SEXP vec, SEXP val)
 	top = VECTOR_ELT(val, 0);
 	i = 0;
 	for (val = vec; !isNull(val); val = CDR(val))
-	    SET_TAG(val, install(translateChar(STRING_ELT(top, i++))));
+	    SET_TAG(val, installTrChar(STRING_ELT(top, i++)));
     }
     UNPROTECT(2);
     return vec;
@@ -1028,7 +1037,7 @@ SEXP attribute_hidden do_dimgets(SEXP call, SEXP op, SEXP args, SEXP env)
 	if (s == R_NilValue) return x;
     }
     PROTECT(args = ans);
-    if (NAMED(x) > 1) SETCAR(args, x = duplicate(x));
+    if (MAYBE_SHARED(x)) SETCAR(args, x = shallow_duplicate(x));
     setAttrib(x, R_DimSymbol, CADR(args));
     setAttrib(x, R_NamesSymbol, R_NilValue);
     UNPROTECT(1);
@@ -1138,7 +1147,7 @@ SEXP attribute_hidden do_levelsgets(SEXP call, SEXP op, SEXP args, SEXP env)
 	warningcall(call, "duplicated levels in factors are deprecated");
 /* TODO errorcall(call, _("duplicated levels are not allowed in factors anymore")); */
     PROTECT(args = ans);
-    if (NAMED(CAR(args)) > 1) SETCAR(args, duplicate(CAR(args)));
+    if (MAYBE_SHARED(CAR(args))) SETCAR(args, duplicate(CAR(args)));
     setAttrib(CAR(args), R_LevelsSymbol, CADR(args));
     UNPROTECT(1);
     return CAR(args);
@@ -1189,8 +1198,8 @@ SEXP attribute_hidden do_attributesgets(SEXP call, SEXP op, SEXP args, SEXP env)
 	   As from R 2.7.0 we don't optimize NAMED == 1 _if_ we are
 	   setting any attributes as an error later on would leave
 	   'obj' changed */
-	if (NAMED(object) > 1 || (NAMED(object) == 1 && nattrs))
-	    object = duplicate(object);
+	if (MAYBE_SHARED(object) || (MAYBE_REFERENCED(object) && nattrs))
+	    object = shallow_duplicate(object);
 	PROTECT(object);
     }
 
@@ -1227,7 +1236,7 @@ SEXP attribute_hidden do_attributesgets(SEXP call, SEXP op, SEXP args, SEXP env)
 	}
 	for (i = 0; i < nattrs; i++) {
 	    if (i == i0) continue;
-	    setAttrib(object, install(translateChar(STRING_ELT(names, i))),
+	    setAttrib(object, installTrChar(STRING_ELT(names, i)),
 		      VECTOR_ELT(attrs, i));
 	}
     }
@@ -1416,8 +1425,8 @@ SEXP attribute_hidden do_attrgets(SEXP call, SEXP op, SEXP args, SEXP env)
 
 
     obj = CAR(args);
-    if (NAMED(obj) == 2)
-	PROTECT(obj = duplicate(obj));
+    if (MAYBE_SHARED(obj))
+	PROTECT(obj = shallow_duplicate(obj));
     else
 	PROTECT(obj);
 
@@ -1447,6 +1456,7 @@ SEXP attribute_hidden do_attrgets(SEXP call, SEXP op, SEXP args, SEXP env)
 /* These provide useful shortcuts which give access to */
 /* the dimnames for matrices and arrays in a standard form. */
 
+/* NB: this may return R_alloc-ed rn and dn */
 void GetMatrixDimnames(SEXP x, SEXP *rl, SEXP *cl,
 		       const char **rn, const char **cn)
 {
@@ -1622,9 +1632,9 @@ SEXP R_do_slot_assign(SEXP obj, SEXP name, SEXP value) {
     PROTECT(obj); PROTECT(value);
     /* Ensure that name is a symbol */
     if(isString(name) && LENGTH(name) == 1)
-	name = install(translateChar(STRING_ELT(name, 0)));
+	name = installTrChar(STRING_ELT(name, 0));
     if(TYPEOF(name) == CHARSXP)
-	name = install(translateChar(name));
+	name = installTrChar(name);
     if(!isSymbol(name) )
 	error(_("invalid type or length for slot name"));
 
@@ -1643,8 +1653,8 @@ SEXP R_do_slot_assign(SEXP obj, SEXP name, SEXP value) {
 	/* simplified version of setAttrib(obj, name, value);
 	   here we do *not* treat "names", "dimnames", "dim", .. specially : */
 	PROTECT(name);
-	if (NAMED(value)) value = duplicate(value);
-	SET_NAMED(value, NAMED(value) | NAMED(obj));
+	if (MAYBE_REFERENCED(value)) value = R_FixupRHS(obj, value);
+	//SET_NAMED(value, NAMED(value) | NAMED(obj));
 	UNPROTECT(1);
 	installAttrib(obj, name, value);
 #endif
@@ -1664,7 +1674,7 @@ SEXP attribute_hidden do_AT(SEXP call, SEXP op, SEXP args, SEXP env)
      * test expression should kick out on the first element. */
     if(!(isSymbol(nlist) || (isString(nlist) && LENGTH(nlist) == 1)))
 	error(_("invalid type or length for slot name"));
-    if(isString(nlist)) nlist = install(translateChar(STRING_ELT(nlist, 0)));
+    if(isString(nlist)) nlist = installTrChar(STRING_ELT(nlist, 0));
     PROTECT(object = eval(CAR(args), env));
     if(!s_dot_Data) init_slot_handling();
     if(nlist != s_dot_Data && !IS_S4_OBJECT(object)) {
@@ -1711,7 +1721,7 @@ R_getS4DataSlot(SEXP obj, SEXPTYPE type)
     if(s3class == R_NilValue && type == S4SXP)
       return R_NilValue;
     PROTECT(s3class);
-    if(NAMED(obj)) obj = duplicate(obj);
+    if(MAYBE_REFERENCED(obj)) obj = shallow_duplicate(obj);
     UNPROTECT(1);
     if(s3class != R_NilValue) {/* replace class with S3 class */
       setAttrib(obj, R_ClassSymbol, s3class);

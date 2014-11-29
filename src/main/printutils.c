@@ -1,7 +1,7 @@
 /*
  *  R : A Computer Language for Statistical Data Analysis
  *  Copyright (C) 1995, 1996  Robert Gentleman and Ross Ihaka
- *  Copyright (C) 1999--2012  The R Core Team
+ *  Copyright (C) 1999--2014  The R Core Team
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -142,16 +142,17 @@ const char *EncodeInteger(int x, int w)
 }
 
 attribute_hidden
-const char *EncodeRaw(Rbyte x)
+const char *EncodeRaw(Rbyte x, const char * prefix)
 {
     static char buff[10];
-    sprintf(buff, "%02x", x);
+    sprintf(buff, "%s%02x", prefix, x);
     return buff;
 }
 
 attribute_hidden
 const char *EncodeEnvironment(SEXP x)
 {
+    const void *vmax = vmaxget();
     static char ch[1000];
     if (x == R_GlobalEnv)
 	sprintf(ch, "<environment: R_GlobalEnv>");
@@ -167,6 +168,7 @@ const char *EncodeEnvironment(SEXP x)
 		translateChar(STRING_ELT(R_NamespaceEnvSpec(x), 0)));
     else snprintf(ch, 1000, "<environment: %p>", (void *)x);
 
+    vmaxset(vmax);
     return ch;
 }
 
@@ -326,6 +328,7 @@ int Rstrwid(const char *str, int slen, cetype_t ienc, int quote)
 			break;
 		    case L'\'':
 		    case L'"':
+		    case L'`':
 			len += (quote == *p) ? 2 : 1;
 			break;
 		    default:
@@ -374,6 +377,7 @@ int Rstrwid(const char *str, int slen, cetype_t ienc, int quote)
 			len += 2; break;
 		    case '\'':
 		    case '"':
+		    case '`':
 			len += (quote == *p)? 2 : 1; break;
 		    default:
 			len++; break;
@@ -429,6 +433,8 @@ const char *EncodeString(SEXP s, int w, int quote, Rprt_adj justify)
     const char *p; char *q, buf[11];
     cetype_t ienc = getCharCE(s);
     Rboolean useUTF8 = w < 0;
+    const void *vmax = vmaxget();
+
     if (w < 0) w = w + 1000000;
 
     /* We have to do something like this as the result is returned, and
@@ -546,6 +552,7 @@ const char *EncodeString(SEXP s, int w, int quote, Rprt_adj justify)
 			break;
 		    case L'\'':
 		    case L'"':
+		    case L'`':
 			if(quote == *p)  *q++ = '\\'; *q++ = *p++;
 			break;
 		    default:
@@ -616,6 +623,7 @@ const char *EncodeString(SEXP s, int w, int quote, Rprt_adj justify)
 		    case '\\': *q++ = '\\'; *q++ = '\\'; break;
 		    case '\'':
 		    case '"':
+		    case '`':
 			if(quote == *p)  *q++ = '\\'; *q++ = *p; break;
 		    default: *q++ = *p; break;
 		    }
@@ -659,6 +667,8 @@ const char *EncodeString(SEXP s, int w, int quote, Rprt_adj justify)
 	for(i = 0 ; i < b ; i++) *q++ = ' ';
     }
     *q = '\0';
+
+    vmaxset(vmax);
     return buffer->data;
 }
 
@@ -693,7 +703,7 @@ const char *EncodeElement(SEXP x, int indx, int quote, char dec)
 	res = EncodeComplex(COMPLEX(x)[indx], w, d, e, wi, di, ei, dec);
 	break;
     case RAWSXP:
-	res = EncodeRaw(RAW(x)[indx]);
+	res = EncodeRaw(RAW(x)[indx], "");
 	break;
     default:
 	res = NULL; /* -Wall */
@@ -701,6 +711,15 @@ const char *EncodeElement(SEXP x, int indx, int quote, char dec)
     }
     return res;
 }
+
+/* EncodeChar is a simple wrapper for EncodeString
+   called by error messages to display CHARSXP values */
+//attribute_hidden
+const char *EncodeChar(SEXP x)
+{
+    return EncodeString(x, 0, 0, Rprt_adj_left);
+}
+
 
 void Rprintf(const char *format, ...)
 {

@@ -2,7 +2,7 @@
  *  A PicTeX device, (C) 1996 Valerio Aimale, for
  *  R : A Computer Language for Statistical Data Analysis
  *  Copyright (C) 1995, 1996  Robert Gentleman and Ross Ihaka
- *  Copyright (C) 2001-11  The R Core Team
+ *  Copyright (C) 2001-2013  The R Core Team
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -660,6 +660,8 @@ Rboolean PicTeXDeviceDriver(pDevDesc dd, const char *filename,
     dd->right = in2dots(width);/* right */
     dd->bottom = 0;		/* bottom */
     dd->top = in2dots(height);/* top */
+    dd->clipLeft = dd->left; dd->clipRight = dd->right;
+    dd->clipBottom = dd->bottom; dd->clipTop = dd->top;
     ptd->width = width;
     ptd->height = height;
 
@@ -714,12 +716,11 @@ Rboolean PicTeXDeviceDriver(pDevDesc dd, const char *filename,
 SEXP PicTeX(SEXP args)
 {
     pGEDevDesc dd;
-    char *vmax;
     const char *file, *bg, *fg;
     double height, width;
     Rboolean debug;
 
-    vmax = vmaxget();
+    const void *vmax = vmaxget();
     args = CDR(args); /* skip entry point name */
     file = translateChar(asChar(CAR(args))); args = CDR(args);
     bg = CHAR(asChar(CAR(args)));   args = CDR(args);

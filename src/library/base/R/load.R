@@ -1,7 +1,7 @@
 #  File src/library/base/R/load.R
 #  Part of the R package, http://www.R-project.org
 #
-#  Copyright (C) 1995-2012 The R Core Team
+#  Copyright (C) 1995-2013 The R Core Team
 #
 #  This program is free software; you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
@@ -47,7 +47,7 @@ load <- function (file, envir = parent.frame(), verbose = FALSE)
 
     if (verbose)
     	cat("Loading objects:\n")
-    	
+
     .Internal(loadFromConn2(con, envir, verbose))
 }
 
@@ -60,16 +60,18 @@ save <- function(..., list = character(),
     opts <- getOption("save.defaults")
     if (missing(compress) && ! is.null(opts$compress))
         compress <- opts$compress
+    if (missing(compression_level) && ! is.null(opts$compression_level))
+        compression_level <- opts$compression_level
     if (missing(ascii) && ! is.null(opts$ascii))
         ascii <- opts$ascii
     if (missing(version)) version <- opts$version
     if (!is.null(version) && version < 2)
         warning("Use of save versions prior to 2 is deprecated", domain = NA)
 
-    if(missing(list) && !length(list(...)))
+    names <- as.character(substitute(list(...)))[-1L]
+     if(missing(list) && !length(names))
 	warning("nothing specified to be save()d")
-    names <- as.character( substitute(list(...)))[-1L]
-    list <- c(list, names)
+   list <- c(list, names)
     if (!is.null(version) && version == 1)
         .Internal(save(list, file, ascii, version, envir, eval.promises))
     else {

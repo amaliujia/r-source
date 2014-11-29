@@ -1,7 +1,7 @@
 #  File src/library/stats/R/manova.R
 #  Part of the R package, http://www.R-project.org
 #
-#  Copyright (C) 1995-2012 The R Core Team
+#  Copyright (C) 1995-2013 The R Core Team
 #
 #  This program is free software; you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
@@ -19,7 +19,7 @@
 manova <- function(...)
 {
     Call <- fcall <- match.call()
-    fcall[[1L]] <- as.name("aov")
+    fcall[[1L]] <- quote(stats::aov)
     result <- eval(fcall, parent.frame())
     if(inherits(result, "aovlist")) {
         for(i in seq_along(result)) {

@@ -1,6 +1,6 @@
 % File src/library/base/man/Logic.Rd
 % Part of the R package, http://www.R-project.org
-% Copyright 1995-2012 R Core Team
+% Copyright 1995-2014 R Core Team
 % Distributed under GPL 2 or later
 
 \name{Logic}
@@ -70,11 +70,13 @@ isTRUE(x)
 
   See \link{Syntax} for the precedence of these operators: unlike many
   other languages (including S) the AND and OR operators do not have the
-  same precedence (the AND operators are higher than the OR operators).
+  same precedence (the AND operators have higher precedence than the OR
+  operators).
 }
 \value{
-  For \code{!}, a logical or raw vector of the same length as \code{x}:
-  names, dims and dimnames are copied from \code{x}.
+  For \code{!}, a logical or raw vector(for raw \code{x}) of the same
+  length as \code{x}: names, dims and dimnames are copied from \code{x},
+  and all other attributes (including class) if no coercion is done.
 
   For \code{|}, \code{&} and \code{xor} a logical or raw vector. The
   elements of shorter vectors are recycled as necessary (with a
@@ -95,6 +97,11 @@ isTRUE(x)
   \code{!}, \code{&} and \code{|} are S4 generics, the latter two part
   of the \code{\link[=S4groupGeneric]{Logic}} group generic (and
   hence methods need argument names \code{e1, e2}).
+}
+\note{
+  The elementwise operators are sometimes called as functions as e.g.
+  \code{`&`(x, y)}: see the description of how argument-matching is done
+  in \code{\link[base]{Ops}}.
 }
 \references{
   Becker, R. A., Chambers, J. M. and Wilks, A. R. (1988)

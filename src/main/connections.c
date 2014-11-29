@@ -1,6 +1,6 @@
 /*
  *  R : A Computer Language for Statistical Data Analysis
- *  Copyright (C) 2000-13   The R Core Team.
+ *  Copyright (C) 2000-2014   The R Core Team.
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -316,10 +316,11 @@ int vasprintf(char **strp, const char *fmt, va_list ap);
 # define BUFSIZE 10000
 int dummy_vfprintf(Rconnection con, const char *format, va_list ap)
 {
+    R_CheckStack2(BUFSIZE); // prudence
     char buf[BUFSIZE], *b = buf;
     int res;
-    const void *vmax = vmaxget();
-    int usedRalloc = FALSE, usedVasprintf = FALSE;
+    const void *vmax = NULL; /* -Wall*/
+    int usedVasprintf = FALSE;
     va_list aq;
 
     va_copy(aq, ap);
@@ -336,14 +337,14 @@ int dummy_vfprintf(Rconnection con, const char *format, va_list ap)
     }
 #else
     if(res >= BUFSIZE) { /* res is the desired output length */
-	usedRalloc = TRUE;
+	vmax = vmaxget();
 	/* apparently some implementations count short,
 	   <http://unixpapa.com/incnote/stdio.html>
 	   so add some margin here */
 	b = R_alloc(res + 101, sizeof(char));
-	vsnprintf(b, res+100, format, ap);
+	vsnprintf(b, res + 100, format, ap);
     } else if(res < 0) { /* just a failure indication */
-	usedRalloc = TRUE;
+	vmax = vmaxget();
 	b = R_alloc(10*BUFSIZE, sizeof(char));
 	res = vsnprintf(b, 10*BUFSIZE, format, ap);
 	if (res < 0) {
@@ -378,7 +379,7 @@ int dummy_vfprintf(Rconnection con, const char *format, va_list ap)
 				       zero-length input */
     } else
 	con->write(b, 1, res, con);
-    if(usedRalloc) vmaxset(vmax);
+    if(vmax) vmaxset(vmax);
     if(usedVasprintf) free(b);
     return res;
 }
@@ -606,6 +607,7 @@ static Rboolean file_open(Rconnection con)
 	unlink(name);
 #ifdef Win32
 	strncpy(this->name, name, PATH_MAX);
+        this->name[PATH_MAX - 1] = '\0';
 #endif
 	free((char *) name); /* only free if allocated by R_tmpnam */
     }
@@ -819,6 +821,7 @@ static Rconnection newfile(const char *description, int enc, const char *mode,
 
 /* file() is now implemented as an op of do_url */
 
+
 /* ------------------- fifo connections --------------------- */
 
 #if defined(HAVE_MKFIFO) && defined(HAVE_FCNTL_H)
@@ -938,6 +941,232 @@ static size_t fifo_write(const void *ptr, size_t size, size_t nitems,
     return write(this->fd, ptr, size * nitems)/size;
 }
 
+#elif defined(Win32)  // ----- Windows part ------
+
+// PR#15600, based on https://github.com/0xbaadf00d/r-project_win_fifo
+# define WIN32_LEAN_AND_MEAN 1
+#include <Windows.h>
+#include <wchar.h>
+
+/* Microsoft addition, not supported in Win XP
+errno_t strcat_s(char *strDestination, size_t numberOfElements,
+		 const char *strSource);
+*/
+
+typedef struct fifoconn
+{
+    HANDLE hdl_namedpipe;
+    LPOVERLAPPED overlapped_write;
+} *Rfifoconn;
+
+static char* win_getlasterror_str(void)
+{
+    LPVOID lpv_tempmsg = NULL;
+    unsigned int err_msg_len;
+    char *err_msg = NULL;
+
+    err_msg_len = 
+	FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER | 
+		      FORMAT_MESSAGE_FROM_SYSTEM |
+		      FORMAT_MESSAGE_IGNORE_INSERTS, NULL, GetLastError(),
+		      MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+		      (LPTSTR)&lpv_tempmsg, 0, NULL);
+    err_msg = (char*) malloc(err_msg_len);
+    if (!err_msg) return NULL;
+    ZeroMemory(err_msg, err_msg_len);
+    strncpy(err_msg, (LPTSTR)lpv_tempmsg, err_msg_len - sizeof(wchar_t));
+    LocalFree(lpv_tempmsg);
+    return err_msg;
+}
+
+static Rboolean	fifo_open(Rconnection con)
+{
+    Rfifoconn this = con->private;
+    unsigned int uin_pipname_len = strlen(con->description);
+    unsigned int uin_mode_len = strlen(con->mode);
+    char *hch_pipename = NULL;
+    const char *hch_tempname = NULL;
+    Rboolean boo_retvalue = TRUE;
+
+    /* Prepare FIFO filename */
+    if (!uin_pipname_len) {
+	hch_pipename = R_tmpnam("fifo", "\\\\.\\pipe\\");
+    } else {
+	if (strncmp("\\\\.\\pipe\\", con->description, 9) != 0) {
+	    uin_pipname_len += strlen("\\\\.\\pipe\\") + 1;
+	    hch_pipename = (char*) malloc(uin_pipname_len);
+	    if (!hch_pipename) error(_("allocation of fifo name failed"));
+	    ZeroMemory(hch_pipename, uin_pipname_len);
+/*	    strcpy_s(hch_pipename, uin_pipname_len, "\\\\.\\pipe\\");  Win XP doesn't support this */
+	    strcpy(hch_pipename, "\\\\.\\pipe\\");
+	} else {
+	    hch_pipename = (char*)malloc(uin_pipname_len);
+	    if (!hch_pipename) error(_("allocation of fifo name failed"));
+	    ZeroMemory(hch_pipename, uin_pipname_len);
+	}
+	hch_tempname = R_ExpandFileName(con->description);
+/*	strcat_s(hch_pipename, uin_pipname_len, hch_tempname);  Win XP doesn't support this */
+	strcat(hch_pipename, hch_tempname);
+    }
+
+    /* Prepare FIFO open mode */
+    con->canwrite = (con->mode[0] == 'w' || con->mode[0] == 'a');
+    con->canread = !con->canwrite;
+    if (uin_mode_len >= 2 && con->mode[1] == '+') con->canread = TRUE;
+
+    /*
+    ** FIFO using Windows API -> CreateNamedPipe() OR CreateFile()
+    ** http://msdn.microsoft.com/en-us/library/windows/desktop/aa363858(v=vs.85).aspx
+    ** http://msdn.microsoft.com/en-us/library/windows/desktop/aa365150(v=vs.85).aspx
+    */
+    this->hdl_namedpipe = NULL;
+    this->overlapped_write = (LPOVERLAPPED)malloc(sizeof(OVERLAPPED));
+    this->overlapped_write = CreateEventA(NULL, TRUE, TRUE, NULL);
+    if (con->canwrite) {
+	SECURITY_ATTRIBUTES win_namedpipe_secattr = {0};
+	win_namedpipe_secattr.nLength = sizeof(SECURITY_ATTRIBUTES);
+	win_namedpipe_secattr.lpSecurityDescriptor = NULL;
+	win_namedpipe_secattr.bInheritHandle = FALSE;
+
+	this->hdl_namedpipe = 
+	    CreateNamedPipeA(hch_pipename,
+			     (con->canread ? PIPE_ACCESS_DUPLEX : 
+			      PIPE_ACCESS_OUTBOUND) | FILE_FLAG_OVERLAPPED,
+			     PIPE_TYPE_BYTE, PIPE_UNLIMITED_INSTANCES , 0, 0,
+			     FILE_FLAG_NO_BUFFERING, &win_namedpipe_secattr);
+	if (this->hdl_namedpipe == INVALID_HANDLE_VALUE) {
+	    /*
+	    ** If GetLastError() return 231 (All pipe instances are busy) == File
+	    ** already exist on Unix/Linux...
+	    */
+	    if (GetLastError() != 231) {
+		char *hch_err_msg = win_getlasterror_str();
+		warning(_("cannot create fifo '%s', reason '%s'"), 
+			hch_pipename, hch_err_msg);
+		free(hch_err_msg);
+		boo_retvalue = FALSE;
+	    }
+	}
+    }
+
+    /* Open existing named pipe */
+    if ((boo_retvalue || GetLastError() == 231) && 
+	this->hdl_namedpipe <= (HANDLE)(LONG_PTR) 0) {
+	DWORD dwo_openmode = 0;
+	if (con->canread) dwo_openmode |= GENERIC_READ;
+	if (con->canwrite) dwo_openmode |= GENERIC_WRITE;
+	this->hdl_namedpipe = 
+	    CreateFileA(hch_pipename, dwo_openmode,
+			FILE_SHARE_READ | FILE_SHARE_WRITE,
+			NULL, OPEN_EXISTING, 
+			FILE_ATTRIBUTE_NORMAL | FILE_FLAG_OVERLAPPED,
+			NULL);
+	if (this->hdl_namedpipe == INVALID_HANDLE_VALUE) {
+	    char *hch_err_msg = win_getlasterror_str();
+	    warning(_("cannot open fifo '%s', reason '%s'"), 
+		    hch_pipename, hch_err_msg);
+	    free(hch_err_msg);
+	    boo_retvalue = FALSE;
+	}
+    }
+
+    /* Free malloc-ed variables */
+    free(hch_pipename);
+    if (hch_tempname) free((void*) hch_tempname);
+
+    /* Finalize FIFO configuration (only if FIFO is opened/created) */
+    if (boo_retvalue && this->hdl_namedpipe) {
+	con->isopen = TRUE;
+	con->text = uin_mode_len >= 2 && con->mode[uin_mode_len - 1] == 'b';
+	set_iconv(con);
+	con->save = -1000;
+    }
+
+    /* Done */
+    return boo_retvalue;
+}
+
+static void fifo_close(Rconnection con)
+{
+    Rfifoconn this = con->private;
+    con->isopen = FALSE;
+    con->status = CloseHandle(this->hdl_namedpipe) ? 0 : -1;
+    if (this->overlapped_write) CloseHandle(this->overlapped_write);
+}
+
+static size_t fifo_read(void* ptr, size_t size, size_t nitems, Rconnection con)
+{
+    Rfifoconn this = con->private;
+    size_t read_byte = 0;
+
+    // avoid integer overflow
+    if ((double)size * sizeof(wchar_t) * nitems > UINT_MAX)
+	error(_("too large a block specified"));
+
+    wchar_t *buffer = (wchar_t*)malloc((size * sizeof(wchar_t)) * nitems);
+    if (!buffer) error(_("allocation of fifo buffer failed"));
+    ReadFile(this->hdl_namedpipe, buffer, 
+	     (size * sizeof(wchar_t)) * nitems, (LPDWORD)&read_byte,
+	     this->overlapped_write);
+    wcstombs(ptr, buffer, read_byte / sizeof(wchar_t));
+    free(buffer);
+    return (read_byte / sizeof(wchar_t)) / size;
+}
+
+static size_t	
+fifo_write(const void *ptr, size_t size, size_t nitems, Rconnection con)
+{
+    Rfifoconn this = con->private;
+    size_t written_bytes = 0;
+
+    if (size * sizeof(wchar_t) * nitems > UINT_MAX)
+	error(_("too large a block specified"));
+
+    /* Wait for a client process to connect */
+    ConnectNamedPipe(this->hdl_namedpipe, NULL);
+
+    /* Convert char* to wchar_t* */
+    int str_len = size * nitems;
+    wchar_t *buffer = malloc((str_len + 1) * sizeof(wchar_t));
+    if (!buffer) error(_("allocation of fifo buffer failed"));
+    mbstowcs(buffer, (const char*) ptr, str_len);
+
+    /* Write data */
+    if (WriteFile(this->hdl_namedpipe, buffer, 
+		  size * sizeof(wchar_t) * nitems, (LPDWORD) &written_bytes,
+		  NULL) == FALSE && GetLastError() != ERROR_IO_PENDING) {
+	char *hch_err_msg = win_getlasterror_str();
+	warning(_("cannot write FIFO '%s'"), hch_err_msg);
+	free(hch_err_msg);
+    }
+
+    /* Free data malloc-ed by windows_towchar */
+    free(buffer);
+
+    /* Done */
+    return written_bytes / nitems;
+}
+
+static int fifo_fgetc_internal(Rconnection con)
+{
+    Rfifoconn  this = con->private;
+    DWORD available_bytes = 0;
+    DWORD read_byte = 0;
+    DWORD len = 1 * sizeof(wchar_t);
+    wchar_t c;
+
+    /* Check available bytes on named pipe */
+    PeekNamedPipe(this->hdl_namedpipe, NULL, 0, NULL, &available_bytes, NULL);
+
+    /* Read char if available bytes > 0, otherwize, return R_EOF */
+    if (available_bytes > 0) {
+	ReadFile(this->hdl_namedpipe, &c, len, &read_byte, NULL);
+	return (read_byte == len) ? (char) c : R_EOF;
+    }
+    return R_EOF;
+}
+
+#endif // WIN32
 
 static Rconnection newfifo(const char *description, const char *mode)
 {
@@ -973,11 +1202,10 @@ static Rconnection newfifo(const char *description, const char *mode)
     }
     return new;
 }
-#endif
 
 SEXP attribute_hidden do_fifo(SEXP call, SEXP op, SEXP args, SEXP env)
 {
-#if defined(HAVE_MKFIFO) && defined(HAVE_FCNTL_H)
+#if (defined(HAVE_MKFIFO) && defined(HAVE_FCNTL_H)) || defined(_WIN32)
     SEXP sfile, sopen, ans, class, enc;
     const char *file, *open;
     int ncon, block;
@@ -1012,6 +1240,7 @@ SEXP attribute_hidden do_fifo(SEXP call, SEXP op, SEXP args, SEXP env)
     con = Connections[ncon] = newfifo(file, strlen(open) ? open : "r");
     con->blocking = block;
     strncpy(con->encname, CHAR(STRING_ELT(enc, 0)), 100); /* ASCII */
+    con->encname[100 - 1] = '\0';
     con->ex_ptr = PROTECT(R_MakeExternalPtr(con->id, install("connection"), R_NilValue));
 
     /* open it if desired */
@@ -1045,6 +1274,7 @@ static Rboolean pipe_open(Rconnection con)
 {
     FILE *fp;
     char mode[3];
+    Rfileconn this = con->private;
 
 #ifdef Win32
     strncpy(mode, con->mode, 2);
@@ -1074,12 +1304,14 @@ static Rboolean pipe_open(Rconnection con)
 		strerror(errno));
 	return FALSE;
     }
-    ((Rfileconn)(con->private))->fp = fp;
+    this->fp = fp;
     con->isopen = TRUE;
     con->canwrite = (con->mode[0] == 'w');
     con->canread = !con->canwrite;
     if(strlen(con->mode) >= 2 && con->mode[1] == 'b') con->text = FALSE;
     else con->text = TRUE;
+    this->last_was_write = !con->canread;
+    this->rpos = this->wpos = 0;
     set_iconv(con);
     con->save = -1000;
     return TRUE;
@@ -1173,6 +1405,7 @@ SEXP attribute_hidden do_pipe(SEXP call, SEXP op, SEXP args, SEXP env)
 	con = newpipe(file, ienc, strlen(open) ? open : "r");
     Connections[ncon] = con;
     strncpy(con->encname, CHAR(STRING_ELT(enc, 0)), 100); /* ASCII */
+    con->encname[100 - 1] = '\0';
     con->ex_ptr = PROTECT(R_MakeExternalPtr(con->id, install("connection"), R_NilValue));
 
     /* open it if desired */
@@ -1819,6 +2052,7 @@ SEXP attribute_hidden do_gzfile(SEXP call, SEXP op, SEXP args, SEXP env)
     ncon = NextConnection();
     Connections[ncon] = con;
     strncpy(con->encname, CHAR(STRING_ELT(enc, 0)), 100); /* ASCII */
+    con->encname[100 - 1] = '\0';
 
     /* see the comment in do_url */
     if (con->encname[0] && !streql(con->encname, "native.enc"))
@@ -2270,7 +2504,7 @@ static void raw_init(Rconnection con, SEXP raw)
 {
     Rrawconn this = con->private;
 
-    this->data = NAMED(raw) ? duplicate(raw) : raw;
+    this->data = MAYBE_REFERENCED(raw) ? duplicate(raw) : raw;
     R_PreserveObject(this->data);
     this->nbytes = XLENGTH(this->data);
     this->pos = 0;
@@ -2500,6 +2734,7 @@ static void text_init(Rconnection con, SEXP text, int type)
     size_t nchars = 0; /* -Wall */
     double dnc = 0.0;
     Rtextconn this = con->private;
+    const void *vmax = vmaxget();
 
     for(i = 0; i < nlines; i++)
 	dnc += 
@@ -2524,6 +2759,7 @@ static void text_init(Rconnection con, SEXP text, int type)
     }
     this->nchars = nchars;
     this->cur = this->save = 0;
+    vmaxset(vmax);
 }
 
 static Rboolean text_open(Rconnection con)
@@ -2644,8 +2880,8 @@ static int text_vfprintf(Rconnection con, const char *format, va_list ap)
 {
     Routtextconn this = con->private;
     char buf[BUFSIZE], *b = buf, *p, *q;
-    const void *vmax = vmaxget();
-    int res = 0, usedRalloc = FALSE, buffree,
+    const void *vmax = NULL;
+    int res = 0, buffree,
 	already = (int) strlen(this->lastline); // we do not allow longer lines
     SEXP tmp;
 
@@ -2665,14 +2901,14 @@ static int text_vfprintf(Rconnection con, const char *format, va_list ap)
     }
     va_end(aq);
     if(res >= buffree) { /* res is the desired output length */
-	usedRalloc = TRUE;
+	vmax = vmaxget();
 	b = R_alloc(res + already + 1, sizeof(char));
 	strcpy(b, this->lastline);
 	p = b + already;
 	vsprintf(p, format, ap);
     } else if(res < 0) { /* just a failure indication */
 #define NBUFSIZE (already + 100*BUFSIZE)
-	usedRalloc = TRUE;
+	vmax = vmaxget();
 	b = R_alloc(NBUFSIZE, sizeof(char));
 	strncpy(b, this->lastline, NBUFSIZE);
 	*(b + NBUFSIZE - 1) = '\0';
@@ -2725,7 +2961,7 @@ static int text_vfprintf(Rconnection con, const char *format, va_list ap)
 	    break;
 	}
     }
-    if(usedRalloc) vmaxset(vmax);
+    if(vmax) vmaxset(vmax);
     return res;
 }
 
@@ -2936,6 +3172,7 @@ SEXP attribute_hidden do_sockconn(SEXP call, SEXP op, SEXP args, SEXP env)
     Connections[ncon] = con;
     con->blocking = blocking;
     strncpy(con->encname, CHAR(STRING_ELT(enc, 0)), 100); /* ASCII */
+    con->encname[100 - 1] = '\0';
     con->ex_ptr = PROTECT(R_MakeExternalPtr(con->id, install("connection"), R_NilValue));
 
     /* open it if desired */
@@ -2989,6 +3226,7 @@ SEXP attribute_hidden do_unz(SEXP call, SEXP op, SEXP args, SEXP env)
     ncon = NextConnection();
     con = Connections[ncon] = R_newunz(file, strlen(open) ? open : "r");
     strncpy(con->encname, CHAR(STRING_ELT(enc, 0)), 100); /* ASCII */
+    con->encname[100 - 1] = '\0';
     con->ex_ptr = PROTECT(R_MakeExternalPtr(con->id, install("connection"), R_NilValue));
 
     /* open it if desired */
@@ -3296,7 +3534,7 @@ static void con_cleanup(void *data)
 SEXP attribute_hidden do_readLines(SEXP call, SEXP op, SEXP args, SEXP env)
 {
     SEXP ans = R_NilValue, ans2;
-    int ok, warn, c, nbuf, buf_size = BUF_SIZE;
+    int ok, warn, skipNul, c, nbuf, buf_size = BUF_SIZE;
     int oenc = CE_NATIVE;
     Rconnection con = NULL;
     Rboolean wasopen;
@@ -3308,19 +3546,23 @@ SEXP attribute_hidden do_readLines(SEXP call, SEXP op, SEXP args, SEXP env)
     checkArity(op, args);
     if(!inherits(CAR(args), "connection"))
 	error(_("'con' is not a connection"));
-    con = getConnection(asInteger(CAR(args)));
-    n = asVecSize(CADR(args));
+    con = getConnection(asInteger(CAR(args))); args = CDR(args);
+    n = asVecSize(CAR(args)); args = CDR(args);
     if(n == -999)
 	error(_("invalid '%s' argument"), "n");
-    ok = asLogical(CADDR(args));
+    ok = asLogical(CAR(args));  args = CDR(args);
     if(ok == NA_LOGICAL)
 	error(_("invalid '%s' argument"), "ok");
-    warn = asLogical(CADDDR(args));
+    warn = asLogical(CAR(args));  args = CDR(args);
     if(warn == NA_LOGICAL)
 	error(_("invalid '%s' argument"), "warn");
-    if(!isString(CAD4R(args)) || LENGTH(CAD4R(args)) != 1)
+    if(!isString(CAR(args)) || LENGTH(CAR(args)) != 1)
 	error(_("invalid '%s' value"), "encoding");
-    encoding = CHAR(STRING_ELT(CAD4R(args), 0)); /* ASCII */
+    encoding = CHAR(STRING_ELT(CAR(args), 0));  args = CDR(args); /* ASCII */
+    skipNul = asLogical(CAR(args));
+    if(skipNul == NA_LOGICAL)
+	error(_("invalid '%s' argument"), "skipNul");
+
     wasopen = con->isopen;
     if(!wasopen) {
 	char mode[5];
@@ -3365,7 +3607,7 @@ SEXP attribute_hidden do_readLines(SEXP call, SEXP op, SEXP args, SEXP env)
 	}
 	nbuf = 0;
 	while((c = Rconn_fgetc(con)) != R_EOF) {
-	    if(nbuf == buf_size-1) {  /* need space for the null */
+	    if(nbuf == buf_size-1) {  /* need space for the terminator */
 		buf_size *= 2;
 		char *tmp = (char *) realloc(buf, buf_size);
 		if(!buf) {
@@ -3373,6 +3615,7 @@ SEXP attribute_hidden do_readLines(SEXP call, SEXP op, SEXP args, SEXP env)
 		    error(_("cannot allocate buffer in readLines"));
 		} else buf = tmp;
 	    }
+	    if(skipNul && c == '\0') continue;
 	    if(c != '\n') buf[nbuf++] = (char) c; else break;
 	}
 	buf[nbuf] = '\0';
@@ -3381,6 +3624,8 @@ SEXP attribute_hidden do_readLines(SEXP call, SEXP op, SEXP args, SEXP env)
 	if (nread == 0 && utf8locale &&
 	    !memcmp(buf, "\xef\xbb\xbf", 3)) qbuf = buf + 3;
 	SET_STRING_ELT(ans, nread, mkCharCE(qbuf, oenc));
+	if (warn && strlen(buf) < nbuf)
+	    warning(_("line %d appears to contain an embedded nul"), nread + 1);
 	if(c == R_EOF) goto no_more_lines;
     }
     if(!wasopen) {endcontext(&cntxt); con->close(con);}
@@ -4416,7 +4661,7 @@ void con_pushback(Rconnection con, Rboolean newLine, char *line)
 
 SEXP attribute_hidden do_pushback(SEXP call, SEXP op, SEXP args, SEXP env)
 {
-    int i, n, nexists, newLine;
+    int i, n, nexists, newLine, type;
     Rconnection con = NULL;
     SEXP stext;
     const char *p;
@@ -4431,6 +4676,7 @@ SEXP attribute_hidden do_pushback(SEXP call, SEXP op, SEXP args, SEXP env)
     newLine = asLogical(CADDR(args));
     if(newLine == NA_LOGICAL)
 	error(_("invalid '%s' argument"), "newLine");
+    type = asInteger(CADDDR(args));
     if(!con->canread && !con->isopen)
 	error(_("can only push back on open readable connections"));
     if(!con->text)
@@ -4445,7 +4691,9 @@ SEXP attribute_hidden do_pushback(SEXP call, SEXP op, SEXP args, SEXP env)
 	con->PushBack = q;
 	q += nexists;
 	for(i = 0; i < n; i++) {
-	    p = translateChar(STRING_ELT(stext, n - i - 1));
+	    p = type == 1 ? translateChar(STRING_ELT(stext, n - i - 1))
+			  : ((type == 3) ? translateCharUTF8(STRING_ELT(stext, n - i - 1))
+					 : CHAR(STRING_ELT(stext, n - i - 1)));
 	    *q = (char *) malloc(strlen(p) + 1 + newLine);
 	    if(!(*q)) error(_("could not allocate space for pushback"));
 	    strcpy(*q, p);
@@ -4844,6 +5092,7 @@ SEXP attribute_hidden do_url(SEXP call, SEXP op, SEXP args, SEXP env)
     Connections[ncon] = con;
     con->blocking = block;
     strncpy(con->encname, CHAR(STRING_ELT(enc, 0)), 100); /* ASCII */
+    con->encname[100 - 1] = '\0';
 
     /* only text-mode connections are affected, but we can't tell that
        until the connection is opened, and why set an encoding on a
@@ -5224,6 +5473,7 @@ SEXP attribute_hidden do_gzcon(SEXP call, SEXP op, SEXP args, SEXP rho)
 
     Connections[icon] = new;
     strncpy(new->encname, incon->encname, 100);
+    new->encname[100 - 1] = '\0';
     new->ex_ptr = PROTECT(R_MakeExternalPtr((void *)new->id, install("connection"),
 					    R_NilValue));
     if(incon->isopen) new->open(new);
@@ -5255,9 +5505,12 @@ static unsigned int uiSwap (unsigned int x)
 #define uiSwap(x) (x)
 #endif
 
+/* These are all hidden and used only in serialize.c, 
+   so managing R_alloc stack is prudence. */
 attribute_hidden
 SEXP R_compress1(SEXP in)
 {
+    const void *vmax = vmaxget();
     unsigned int inlen;
     uLong outlen;
     int res;
@@ -5275,12 +5528,14 @@ SEXP R_compress1(SEXP in)
     if(res != Z_OK) error("internal error %d in R_compress1", res);
     ans = allocVector(RAWSXP, outlen + 4);
     memcpy(RAW(ans), buf, outlen + 4);
+    vmaxset(vmax);
     return ans;
 }
 
 attribute_hidden
 SEXP R_decompress1(SEXP in, Rboolean *err)
 {
+    const void *vmax = vmaxget();
     uLong inlen, outlen;
     int res;
     Bytef *buf;
@@ -5300,12 +5555,14 @@ SEXP R_decompress1(SEXP in, Rboolean *err)
     }
     ans = allocVector(RAWSXP, outlen);
     memcpy(RAW(ans), buf, outlen);
+    vmaxset(vmax);
     return ans;
 }
 
 attribute_hidden
 SEXP R_compress2(SEXP in)
 {
+    const void *vmax = vmaxget();
     unsigned int inlen, outlen;
     int res;
     char *buf;
@@ -5331,12 +5588,14 @@ SEXP R_compress2(SEXP in)
     }
     ans = allocVector(RAWSXP, outlen + 5);
     memcpy(RAW(ans), buf, outlen + 5);
+    vmaxset(vmax);
     return ans;
 }
 
 attribute_hidden
 SEXP R_decompress2(SEXP in, Rboolean *err)
 {
+    const void *vmax = vmaxget();
     unsigned int inlen, outlen;
     int res;
     char *buf, *p = (char *) RAW(in), type;
@@ -5373,6 +5632,7 @@ SEXP R_decompress2(SEXP in, Rboolean *err)
     }
     ans = allocVector(RAWSXP, outlen);
     memcpy(RAW(ans), buf, outlen);
+    vmaxset(vmax);
     return ans;
 }
 
@@ -5444,6 +5704,7 @@ static void init_filters(void)
 attribute_hidden
 SEXP R_compress3(SEXP in, Rboolean *err)
 {
+    const void *vmax = vmaxget();
     unsigned int inlen, outlen;
     unsigned char *buf;
     SEXP ans;
@@ -5478,12 +5739,14 @@ SEXP R_compress3(SEXP in, Rboolean *err)
     /* printf("compressed %d to %d\n", inlen, outlen); */
     ans = allocVector(RAWSXP, outlen + 5);
     memcpy(RAW(ans), buf, outlen + 5);
+    vmaxset(vmax);
     return ans;
 }
 
 attribute_hidden
 SEXP R_decompress3(SEXP in, Rboolean *err)
 {
+    const void *vmax = vmaxget();
     unsigned int inlen, outlen;
     unsigned char *buf, *p = RAW(in), type = p[4];
     SEXP ans;
@@ -5542,6 +5805,7 @@ SEXP R_decompress3(SEXP in, Rboolean *err)
     }
     ans = allocVector(RAWSXP, outlen);
     memcpy(RAW(ans), buf, outlen);
+    vmaxset(vmax);
     return ans;
 }
 

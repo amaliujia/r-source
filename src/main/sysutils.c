@@ -199,10 +199,13 @@ FILE *RC_fopen(const SEXP fn, const char *mode, const Rboolean expand)
 #else
 FILE *RC_fopen(const SEXP fn, const char *mode, const Rboolean expand)
 {
-    const char *filename = translateChar(fn);
+    const void *vmax = vmaxget();
+    const char *filename = translateChar(fn), *res;
     if(fn == NA_STRING || !filename) return NULL;
-    if(expand) return fopen(R_ExpandFileName(filename), mode);
-    else return fopen(filename, mode);
+    if(expand) res = R_ExpandFileName(filename);
+    else res = filename;
+    vmaxset(vmax);
+    return fopen(res, mode);
 }
 #endif
 
@@ -310,11 +313,18 @@ int R_system(const char *command)
 #endif
 #ifdef HAVE_SYS_WAIT_H
     if (WIFEXITED(res)) res = WEXITSTATUS(res);
-    else res = 0;
 #else
     /* assume that this is shifted if a multiple of 256 */
     if ((res % 256) == 0) res = res/256;
 #endif
+    if (res == -1) {
+	/* this means that system() failed badly - it didn't
+	   even get to try to run the shell */
+	warning(_("system call failed: %s"), strerror(errno));
+	/* R system() is documented to return 127 on failure, and a lot of
+	   code relies on that - it will misinterpret -1 as success */
+	res = 127;
+    }
     return res;
 }
 
@@ -600,7 +610,7 @@ SEXP attribute_hidden do_iconv(SEXP call, SEXP op, SEXP args, SEXP env)
 	    error(_("invalid '%s' argument"), "toRaw");	
 	/* some iconv's allow "UTF8", but libiconv does not */
 	if(streql(from, "UTF8") || streql(from, "utf8") ) from = "UTF-8";
-	if(streql(to, "UTF8") || streql(from, "utf8") ) to = "UTF-8";
+	if(streql(to, "UTF8") || streql(to, "utf8") ) to = "UTF-8";
 	/* Should we do something about marked CHARSXPs in 'from = ""'? */
 	if(streql(to, "UTF-8")) isUTF8 = TRUE;
 	if(streql(to, "latin1") || streql(to, "ISO_8859-1")
@@ -771,11 +781,13 @@ int Riconv_close (void *cd)
 static void *latin1_obj = NULL, *utf8_obj=NULL, *ucsmb_obj=NULL,
     *ucsutf8_obj=NULL;
 
+/* This may return a R_alloc-ed result, so the caller has to manage the
+   R_alloc stack */
 const char *translateChar(SEXP x)
 {
     void * obj;
     const char *inbuf, *ans = CHAR(x);
-    char *outbuf, *p;
+    char *outbuf;
     size_t inb, outb, res;
     cetype_t ienc = getCharCE(x);
     R_StringBuffer cbuff = {NULL, 0, MAXELTSIZE};
@@ -871,12 +883,118 @@ next_char:
     }
     *outbuf = '\0';
     res = strlen(cbuff.data) + 1;
-    p = R_alloc(res, 1);
+    char *p = R_alloc(res, 1);
     memcpy(p, cbuff.data, res);
     R_FreeStringBuffer(&cbuff);
     return p;
 }
 
+SEXP installTrChar(SEXP x)
+{
+    void * obj;
+    const char *inbuf, *ans = CHAR(x);
+    char *outbuf;
+    size_t inb, outb, res;
+    cetype_t ienc = getCharCE(x);
+    R_StringBuffer cbuff = {NULL, 0, MAXELTSIZE};
+
+    if(TYPEOF(x) != CHARSXP)
+	error(_("'%s' must be called on a CHARSXP"), "installTrChar");
+    if(x == NA_STRING || !(ENC_KNOWN(x))) return install(ans);
+    if(IS_BYTES(x))
+	error(_("translating strings with \"bytes\" encoding is not allowed"));
+    if(utf8locale && IS_UTF8(x)) return install(ans);
+    if(latin1locale && IS_LATIN1(x)) return install(ans);
+    if(IS_ASCII(x)) return install(ans);
+
+    if(IS_LATIN1(x)) {
+	if(!latin1_obj) {
+	    obj = Riconv_open("", "latin1");
+	    /* should never happen */
+	    if(obj == (void *)(-1))
+#ifdef Win32
+		error(_("unsupported conversion from '%s' in codepage %d"),
+		      "latin1", localeCP);
+#else
+	        error(_("unsupported conversion from '%s' to '%s'"),
+		      "latin1", "");
+#endif
+	    latin1_obj = obj;
+	}
+	obj = latin1_obj;
+    } else {
+	if(!utf8_obj) {
+	    obj = Riconv_open("", "UTF-8");
+	    /* should never happen */
+	    if(obj == (void *)(-1)) 
+#ifdef Win32
+		error(_("unsupported conversion from '%s' in codepage %d"),
+		      "latin1", localeCP);
+#else
+	        error(_("unsupported conversion from '%s' to '%s'"),
+		      "latin1", "");
+#endif
+	    utf8_obj = obj;
+	}
+	obj = utf8_obj;
+    }
+
+    R_AllocStringBuffer(0, &cbuff);
+top_of_loop:
+    inbuf = ans; inb = strlen(inbuf);
+    outbuf = cbuff.data; outb = cbuff.bufsize - 1;
+    /* First initialize output */
+    Riconv (obj, NULL, NULL, &outbuf, &outb);
+next_char:
+    /* Then convert input  */
+    res = Riconv(obj, &inbuf , &inb, &outbuf, &outb);
+    if(res == -1 && errno == E2BIG) {
+	R_AllocStringBuffer(2*cbuff.bufsize, &cbuff);
+	goto top_of_loop;
+    } else if(res == -1 && (errno == EILSEQ || errno == EINVAL)) {
+	if(outb < 13) {
+	    R_AllocStringBuffer(2*cbuff.bufsize, &cbuff);
+	    goto top_of_loop;
+	}
+	if (ienc == CE_UTF8) {
+	    /* if starting in UTF-8, use \uxxxx */
+	    /* This must be the first byte */
+	    size_t clen;
+	    wchar_t wc;
+	    clen = utf8toucs(&wc, inbuf);
+	    if(clen > 0 && inb >= clen) {
+		inbuf += clen; inb -= clen;
+# ifndef Win32
+		if((unsigned int) wc < 65536) {
+# endif
+		    snprintf(outbuf, 9, "<U+%04X>", (unsigned int) wc);
+		    outbuf += 8; outb -= 8;
+# ifndef Win32
+		} else {
+		    snprintf(outbuf, 13, "<U+%08X>", (unsigned int) wc);
+		    outbuf += 12; outb -= 12;
+		}
+# endif
+	    } else {
+		snprintf(outbuf, 5, "<%02x>", (unsigned char)*inbuf);
+		outbuf += 4; outb -= 4;
+		inbuf++; inb--;
+	    }
+	} else {
+	    snprintf(outbuf, 5, "<%02x>", (unsigned char)*inbuf);
+	    outbuf += 4; outb -= 4;
+	    inbuf++; inb--;
+	}
+	goto next_char;
+    }
+    *outbuf = '\0';
+    SEXP Sans = install(cbuff.data);
+    R_FreeStringBuffer(&cbuff);
+    return Sans;
+}
+
+/* This may return a R_alloc-ed result, so the caller has to manage the
+   R_alloc stack */
 const char *translateChar0(SEXP x)
 {
     if(TYPEOF(x) != CHARSXP)
@@ -885,6 +1003,8 @@ const char *translateChar0(SEXP x)
     return translateChar(x);
 }
 
+/* This may return a R_alloc-ed result, so the caller has to manage the
+   R_alloc stack */
 const char *translateCharUTF8(SEXP x)
 {
     void *obj;
@@ -957,6 +1077,8 @@ static void *latin1_wobj = NULL, *utf8_wobj=NULL;
    NB: that wchar_t is UCS-4 is an assumption, but not easy to avoid.
 */
 
+/* This may return a R_alloc-ed result, so the caller has to manage the
+   R_alloc stack */
 attribute_hidden /* but not hidden on Windows, where it was used in tcltk.c */
 const wchar_t *wtransChar(SEXP x)
 {
@@ -1042,6 +1164,8 @@ next_char:
 
 extern void *Rf_AdobeSymbol2utf8(char* work, const char *c0, size_t nwork); /* from util.c */
 
+/* This may return a R_alloc-ed result, so the caller has to manage the
+   R_alloc stack */
 const char *reEnc(const char *x, cetype_t ce_in, cetype_t ce_out, int subst)
 {
     void * obj;
@@ -1163,6 +1287,112 @@ next_char:
     return p;
 }
 
+#ifdef Win32
+/* A version avoiding R_alloc for use in the Rgui editor */
+void reEnc2(const char *x, char *y, int ny,
+	    cetype_t ce_in, cetype_t ce_out, int subst)
+{
+    void * obj;
+    const char *inbuf;
+    char *outbuf;
+    size_t inb, outb, res, top;
+    char *tocode = NULL, *fromcode = NULL;
+    char buf[20];
+    R_StringBuffer cbuff = {NULL, 0, MAXELTSIZE};
+
+    strncpy(y, x, ny);
+    y[ny - 1] = '\0';
+
+    if(ce_in == ce_out || ce_in == CE_ANY || ce_out == CE_ANY) return;
+    if(utf8locale && ce_in == CE_NATIVE && ce_out == CE_UTF8) return;
+    if(utf8locale && ce_out == CE_NATIVE && ce_in == CE_UTF8) return;
+    if(latin1locale && ce_in == CE_NATIVE && ce_out == CE_LATIN1) return;
+    if(latin1locale && ce_out == CE_NATIVE && ce_in == CE_LATIN1) return;
+
+    if(strIsASCII(x)) return;
+
+    switch(ce_in) {
+    case CE_NATIVE:
+	{
+	    /* Looks like CP1252 is treated as Latin-1 by iconv */
+	    snprintf(buf, 20, "CP%d", localeCP);
+	    fromcode = buf;
+	    break;
+	}
+    case CE_LATIN1: fromcode = "CP1252"; break;
+    case CE_UTF8:   fromcode = "UTF-8"; break;
+    default: return;
+    }
+
+    switch(ce_out) {
+    case CE_NATIVE:
+	{
+	    /* avoid possible misidentification of CP1250 as LATIN-2 */
+	    snprintf(buf, 20, "CP%d", localeCP);
+	    tocode = buf;
+	    break;
+	}
+    case CE_LATIN1: tocode = "latin1"; break;
+    case CE_UTF8:   tocode = "UTF-8"; break;
+    default: return;
+    }
+
+    obj = Riconv_open(tocode, fromcode);
+    if(obj == (void *)(-1)) return;
+    R_AllocStringBuffer(0, &cbuff);
+top_of_loop:
+    inbuf = x; inb = strlen(inbuf);
+    outbuf = cbuff.data; top = outb = cbuff.bufsize - 1;
+    /* First initialize output */
+    Riconv (obj, NULL, NULL, &outbuf, &outb);
+next_char:
+    /* Then convert input  */
+    res = Riconv(obj, &inbuf , &inb, &outbuf, &outb);
+    if(res == -1 && errno == E2BIG) {
+	R_AllocStringBuffer(2*cbuff.bufsize, &cbuff);
+	goto top_of_loop;
+    } else if(res == -1 && (errno == EILSEQ || errno == EINVAL)) {
+	switch(subst) {
+	case 1: /* substitute hex */
+	    if(outb < 5) {
+		R_AllocStringBuffer(2*cbuff.bufsize, &cbuff);
+		goto top_of_loop;
+	    }
+	    snprintf(outbuf, 5, "<%02x>", (unsigned char)*inbuf);
+	    outbuf += 4; outb -= 4;
+	    inbuf++; inb--;
+	    goto next_char;
+	    break;
+	case 2: /* substitute . */
+	    if(outb < 1) {
+		R_AllocStringBuffer(2*cbuff.bufsize, &cbuff);
+		goto top_of_loop;
+	    }
+	    *outbuf++ = '.'; inbuf++; outb--; inb--;
+	    goto next_char;
+	    break;
+	case 3: /* substitute ? */
+	    if(outb < 1) {
+		R_AllocStringBuffer(2*cbuff.bufsize, &cbuff);
+		goto top_of_loop;
+	    }
+	    *outbuf++ = '?'; inbuf++; outb--; inb--;
+	    goto next_char;
+	    break;
+	default: /* skip byte */
+	    inbuf++; inb--;
+	    goto next_char;
+	}
+    }
+    Riconv_close(obj);
+    *outbuf = '\0';
+    res = (top-outb)+1; /* strlen(cbuff.data) + 1; */
+    if (res > ny) error("converted string too long for buffer");
+    memcpy(y, cbuff.data, res);
+    R_FreeStringBuffer(&cbuff);
+}
+#endif
+
 void attribute_hidden
 invalidate_cached_recodings(void)
 {
@@ -1176,6 +1406,7 @@ invalidate_cached_recodings(void)
 }
 
 
+/* in C11 these could use char32_t */
 #ifdef WORDS_BIGENDIAN
 static const char UNICODE[] = "UCS-4BE";
 #else
@@ -1206,6 +1437,7 @@ size_t ucstomb(char *s, const unsigned int wc)
 	    char tocode[128];
 	    /* locale set fuzzy case */
 	    strncpy(tocode, locale2charset(NULL), sizeof(tocode));
+            tocode[sizeof(tocode) - 1] = '\0';
 	    if((void *)(-1) == (cd = Riconv_open(tocode, UNICODE)))
 		return (size_t)(-1);
 #else
@@ -1301,15 +1533,11 @@ size_t ucstoutf8(char *s, const unsigned int wc)
 
     if (status == (size_t) -1) {
 	switch(errno){
-	case EINVAL:
-	    return (size_t) -2;
-	case EILSEQ:
-	    return (size_t) -1;
 	case E2BIG:
 	    break;
 	default:
-	    errno = EILSEQ;
-	    return (size_t) -1;
+	    error(_("invalid Unicode point %u"), wc);
+	    return (size_t) -1; // Not reached
 	}
     }
     *outbuf = '\0';

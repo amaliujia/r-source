@@ -1,6 +1,6 @@
 % File src/library/base/man/call.Rd
 % Part of the R package, http://www.R-project.org
-% Copyright 1995-2012 R Core Team
+% Copyright 1995-2013 R Core Team
 % Distributed under GPL 2 or later
 
 \name{call}
@@ -41,8 +41,7 @@ as.call(x)
   so should be a function or the name of one (as a symbol; a quoted
   string will not do).
 
-  All three are \link{primitive} functions.  \code{call} is
-  \sQuote{special}: it only evaluates its first argument.
+  All three are \link{primitive} functions. 
 }
 \section{Warning}{
   \code{call} should not be used to attempt to evade restrictions on the

@@ -140,6 +140,11 @@ void R_ProcessEvents(void)
     if(R_Tcl_do) R_Tcl_do();
 }
 
+void R_WaitEvent(void)
+{
+    if (!peekevent()) waitevent();
+}
+
 
 /*
  *  1) FATAL MESSAGES AT STARTUP
@@ -285,7 +290,7 @@ ThreadedReadConsole(const char *prompt, char *buf, int len, int addtohistory)
     thist = addtohistory;
     SetEvent(EhiWakeUp);
     while (1) {
-	if (!peekevent()) WaitMessage();
+	R_WaitEvent();
 	if (lineavailable) break;
 	doevent();
 	if(R_Tcl_do) R_Tcl_do();
@@ -327,7 +332,7 @@ FileReadConsole(const char *prompt, char *buf, int len, int addhistory)
 	char obuf[len+1], *ob = obuf;
 	if(!cd) {
 	    cd = Riconv_open("", R_StdinEnc);
-	    if(!cd) error(_("encoding '%s' is not recognised"), R_StdinEnc);
+	    if(cd == (void *)-1) error(_("encoding '%s' is not recognised"), R_StdinEnc);
 	}
 	res = Riconv(cd, &ib, &inb, &ob, &onb);
 	*ob = '\0';
@@ -880,7 +885,7 @@ int cmdlineoptions(int ac, char **av)
 	ms.dwLength = sizeof(MEMORYSTATUSEX);
 	GlobalMemoryStatusEx(&ms); /* Win2k or later */
 	Virtual = ms.ullTotalVirtual; /* uint64 = DWORDLONG */
-#ifdef WIN64
+#ifdef _WIN64
 	R_max_memory = ms.ullTotalPhys;
 #else
 	R_max_memory = min(Virtual - 512*Mega, ms.ullTotalPhys);
@@ -1029,6 +1034,12 @@ int cmdlineoptions(int ac, char **av)
 		break;
 	    } else if(CharacterMode == RTerm && !strcmp(*av, "-f")) {
 		ac--; av++;
+		if (!ac) {
+		    snprintf(s, 1024,
+			    _("option '%s' requires an argument"),
+			    "-f");
+		    R_Suicide(s);
+		}
 		Rp->R_Interactive = FALSE;
 		Rp->ReadConsole = FileReadConsole;
 		if(strcmp(*av, "-")) {
@@ -1054,6 +1065,12 @@ int cmdlineoptions(int ac, char **av)
 		}
 	    } else if(CharacterMode == RTerm && !strcmp(*av, "-e")) {
 		ac--; av++;
+		if (!ac || !strlen(*av)) {
+		    snprintf(s, 1024,
+			    _("option '%s' requires a non-empty argument"),
+			    "-e");
+		    R_Suicide(s);
+		}
 		if(strlen(cmdlines) + strlen(*av) + 2 <= 10000) {
 		    strcat(cmdlines, *av);
 		    strcat(cmdlines, "\n");

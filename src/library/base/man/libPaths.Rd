@@ -1,6 +1,6 @@
 % File src/library/base/man/libPaths.Rd
 % Part of the R package, http://www.R-project.org
-% Copyright 1995-2012 R Core Team
+% Copyright 1995-2013 R Core Team
 % Distributed under GPL 2 or later
 
 \name{libPaths}
@@ -42,6 +42,12 @@
   the existing directories in \code{unique(c(new, .Library.site, .Library))}
   and this is returned.  If given no argument, a character vector with
   the currently active library trees is returned.
+
+  How paths \code{new} with a trailing slash are treated is
+  OS-dependent.  On a POSIX filesystem existing directories can usually
+  be specified with a trailing slash: on Windows filepaths with a
+  trailing slash (or backslash) are invalid and so will never be added
+  to the library search path.
 
 #ifdef unix
   The library search path is initialized at startup from the environment

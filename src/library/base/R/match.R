@@ -1,7 +1,7 @@
 #  File src/library/base/R/match.R
 #  Part of the R package, http://www.R-project.org
 #
-#  Copyright (C) 1995-2012 The R Core Team
+#  Copyright (C) 1995-2013 The R Core Team
 #
 #  This program is free software; you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
@@ -66,6 +66,6 @@ char.expand <- function(input, target, nomatch = stop("no match"))
     if(!(is.character(input) && is.character(target)))
 	stop("'input' and 'target' must be character vectors")
     y <- .Internal(charmatch(input, target, NA_integer_))
-    if(any(is.na(y))) eval(nomatch)
+    if(anyNA(y)) eval(nomatch)
     target[y]
 }

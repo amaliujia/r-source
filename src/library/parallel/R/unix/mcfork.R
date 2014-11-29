@@ -1,7 +1,7 @@
 #  File src/library/parallel/R/unix/mcfork.R
 #  Part of the R package, http://www.R-project.org
 #
-#  Copyright (C) 1995-2012 The R Core Team
+#  Copyright (C) 1995-2013 The R Core Team
 #
 #  This program is free software; you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
@@ -22,17 +22,15 @@
 
 ## all not exported in parallel.
 
-mc_pids <- new.env()
-assign("pids", integer(), envir = mc_pids)
+## registered as finalizer in .onLoad() to kill all child processes
 clean_pids <- function(e)
-    if(length(pids <- get("pids", envir = e))) tools::pskill(pids, tools::SIGKILL)
+    if(length(pids <- sapply(children(), function(o) o$pid))) tools::pskill(pids, tools::SIGKILL)
 
-mcfork <- function() {
-    r <- .Call(C_mc_fork)
-    assign("pids", c(get("pids",envir = mc_pids), r[1L]), envir = mc_pids)
-    structure(list(pid = r[1L], fd = r[2:3]),
-              class = c(if(r[1L]) "childProcess"
-                        else "masterProcess", "process"))
+mcfork <- function(estranged = FALSE) {
+    r <- .Call(C_mc_fork, estranged)
+    processClass <- if (!r[1L]) "masterProcess" else
+    		    if (is.na(r[2L])) "estrangedProcess" else "childProcess"
+    structure(list(pid = r[1L], fd = r[2:3]), class = c(processClass, "process"))
 }
 
 ## not used
@@ -128,8 +126,8 @@ masterDescriptor <- function() .Call(C_mc_master_fd)
 
 isChild <- function() .Call(C_mc_is_child)
 
-closeStdout <- function() .Call(C_mc_close_stdout)
-closeStderr <- function() .Call(C_mc_close_stderr)
+closeStdout <- function(to.null=FALSE) .Call(C_mc_close_stdout, to.null)
+closeStderr <- function(to.null=FALSE) .Call(C_mc_close_stderr, to.null)
 closeFD <- function(fds) .Call(C_mc_close_fds, as.integer(fds))
 
 closeAll <- function(includeStd = FALSE)
